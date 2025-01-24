@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block start %}
+    <h1>This Template is return by Index Page</h1>
+    
+    <a href="/contact/">
+      Contact
+    </a>
+    |
+    <a href="/about/">
+      About
+    </a>
+
+    <table class="container">
+        <tr>
+          <th>S.No</th>
+          <th>Name</th>
+          <th>Age</th>
+          <th>Can Vote</th>
+        </tr>
+
+        {% for people in peoples %}
+        <tr>
+          <td>{{forloop.counter}}</td>
+          <td>{{people.name}}</td>
+          <td>{{people.age}}</td>
+          <td>
+            {% if people.age >= 18 %}
+            👍
+            {% else %}
+            👎
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor%}
+      </table>
+
+{% endblock %}     

@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block start %}
+
+<div class="container mt-5">    
+    <form class="mb-4">
+        <div class="row">
+            <div class="col-md-6">
+                <input class="form-control" name="search" placeholder="Search">
+            </div>
+
+            <div class="col-md-6">
+                <button class="btn btn-success">Search</button>
+
+            </div>
+        </div>
+
+    </form>
+    <table class="table table-striped">
+        <thead>
+          <tr>
+
+            <th scope="col">#</th>
+            <th scope="col">student_id</th>
+            <th scope="col">student_name</th>
+            <th scope="col">Department</th>
+            <th scope="col">student_age</th>
+            <th scope="col">student_email</th>
+           
+          </tr>
+        </thead>
+        <tbody>
+            {% for student in queryset %}
+          <tr>
+            <th scope="row">{{forloop.counter}}</th>
+            <td>
+                <a href="{% url 'see_marks' student.student_id %}">
+                {{student.student_id}}
+            </a>
+            </td>
+            <td>{{student.student_name}}</td>
+            <td>{{student.department}}</td>
+            <td>{{student.student_age}}</td>
+            <td>{{student.student_email}}</td>
+          </tr>
+            {% endfor %}
+        </tbody>
+
+
+
+    </table>
+    
+        <div class="pagination">
+            <span class="step-links">
+                {% if queryset.has_previous %}
+                    <a href="?page=1">&laquo; first</a>
+                    <a href="?page={{ queryset.previous_page_number }}">previous</a>
+                {% endif %}
+        
+                <span class="current">
+                    Page {{ queryset.number }} of {{ queryset.paginator.num_pages }}.
+                </span>
+        
+                {% if queryset.has_next %}
+                    <a href="?page={{ queryset.next_page_number }}">next</a>
+                    <a href="?page={{ queryset.paginator.num_pages }}">last &raquo;</a>
+                {% endif %}
+            </span>
+        </div>
+
+
+</div>
+
+
+
+
+{% endblock %}

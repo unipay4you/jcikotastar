@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_carousel_widget/flutter_carousel_widget.dart';
 import 'login_screen.dart';
 import 'member_details_screen.dart';
 import 'admin_panel_screen.dart';
@@ -28,6 +29,54 @@ class _MainScreenState extends State<MainScreen> {
   bool _isLoading = false;
   Map<String, dynamic>? _profileData;
   Map<String, dynamic>? _userData;
+  int _currentCarouselIndex = 0;
+
+  // Sample carousel items (replace with your actual data)
+  final List<Map<String, dynamic>> _carouselItems = [
+    {
+      'image':
+          'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1471&q=80',
+      'title': 'Welcome to JCI',
+      'description': 'Join our community of young active citizens',
+    },
+    {
+      'image':
+          'https://images.unsplash.com/photo-1552664730-d307ca884978?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80',
+      'title': 'Leadership Development',
+      'description': 'Grow your leadership skills with JCI',
+    },
+    {
+      'image':
+          'https://images.unsplash.com/photo-1593113598332-cd288d649433?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80',
+      'title': 'Community Service',
+      'description': 'Make a difference in your community',
+    },
+  ];
+
+  // Sample quick action buttons
+  final List<Map<String, dynamic>> _quickActions = [
+    {'icon': Icons.people, 'label': 'Members', 'color': Colors.blue},
+    {'icon': Icons.event, 'label': 'Events', 'color': Colors.green},
+    {'icon': Icons.photo_library, 'label': 'Gallery', 'color': Colors.orange},
+    {'icon': Icons.article, 'label': 'News', 'color': Colors.purple},
+    {'icon': Icons.contact_phone, 'label': 'Contact', 'color': Colors.red},
+  ];
+
+  // Sample featured items
+  final List<Map<String, dynamic>> _featuredItems = [
+    {'title': 'Upcoming Events', 'icon': Icons.event, 'color': Colors.blue},
+    {'title': 'Latest News', 'icon': Icons.article, 'color': Colors.green},
+    {
+      'title': 'Photo Gallery',
+      'icon': Icons.photo_library,
+      'color': Colors.orange
+    },
+    {
+      'title': 'Achievements',
+      'icon': Icons.emoji_events,
+      'color': Colors.purple
+    },
+  ];
 
   @override
   void initState() {
@@ -398,38 +447,245 @@ class _MainScreenState extends State<MainScreen> {
         ),
       ),
       body: RefreshIndicator(
-        onRefresh: () async {
-          print('Pull to refresh triggered'); // Debug print
-          setState(() {
-            _isLoading = true;
-          });
-          try {
-            await _loadProfileData();
-          } finally {
-            if (mounted) {
-              setState(() {
-                _isLoading = false;
-              });
-            }
-          }
-        },
+        onRefresh: _refreshData,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           children: [
-            SizedBox(
-              height: MediaQuery.of(context).size.height -
-                  200, // Adjust height as needed
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : Center(
-                      child: Text(
-                        'Welcome to JCI Member Directory',
-                        style: GoogleFonts.poppins(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
+            // Carousel Slider
+            FlutterCarousel(
+              items: _carouselItems.map((item) {
+                return Builder(
+                  builder: (BuildContext context) {
+                    return Container(
+                      width: MediaQuery.of(context).size.width,
+                      margin: const EdgeInsets.symmetric(horizontal: 5.0),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(15),
+                        image: DecorationImage(
+                          image: NetworkImage(item['image']),
+                          fit: BoxFit.cover,
                         ),
                       ),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(15),
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.7),
+                            ],
+                          ),
+                        ),
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item['title'],
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              item['description'],
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              }).toList(),
+              options: CarouselOptions(
+                height: 200.0,
+                autoPlay: true,
+                enlargeCenterPage: true,
+                aspectRatio: 16 / 9,
+                autoPlayCurve: Curves.fastOutSlowIn,
+                enableInfiniteScroll: true,
+                autoPlayAnimationDuration: const Duration(milliseconds: 800),
+                viewportFraction: 0.8,
+                onPageChanged: (index, reason) {
+                  setState(() {
+                    _currentCarouselIndex = index;
+                  });
+                },
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Quick Action Buttons
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: _quickActions.map((action) {
+                  return Column(
+                    children: [
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: action['color'].withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          action['icon'],
+                          color: action['color'],
+                          size: 30,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        action['label'],
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Featured Items Grid
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 15,
+                  mainAxisSpacing: 15,
+                  childAspectRatio: 1.5,
+                ),
+                itemCount: _featuredItems.length,
+                itemBuilder: (context, index) {
+                  final item = _featuredItems[index];
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: item['color'].withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(15),
                     ),
+                    padding: const EdgeInsets.all(15),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          item['icon'],
+                          color: item['color'],
+                          size: 30,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          item['title'],
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Filter Bar
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search members...',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none,
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[200],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.filter_list),
+                  ),
+                ],
+              ),
+            ),
+
+            // Member Tiles
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: 10, // Replace with actual member count
+                itemBuilder: (context, index) {
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.all(15),
+                      leading: CircleAvatar(
+                        radius: 25,
+                        backgroundColor: Colors.grey[200],
+                        child: const Icon(Icons.person),
+                      ),
+                      title: Text(
+                        'Member Name ${index + 1}',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Position ${index + 1}',
+                        style: GoogleFonts.poppins(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                        ),
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.phone),
+                        onPressed: () {
+                          // Implement call functionality
+                        },
+                      ),
+                      onTap: () {
+                        // Navigate to member details
+                      },
+                    ),
+                  );
+                },
+              ),
             ),
           ],
         ),

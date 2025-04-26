@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "477846587987",
+    "project_id": "jci-kota-star-members",
+    "storage_bucket": "jci-kota-star-members.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:477846587987:android:9a035f01108458cf1b54a6",
+        "android_client_info": {
+          "package_name": "com.example.my_flutter_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCwIfzfuVtydcfUaxzcFrliHic0RM5Biz8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -18,6 +18,8 @@ class ApiConfig {
   static const String members = 'api/members/';
   static const String memberDetails = 'api/members/';
   static const String adminDashboard = 'api/admin/dashboard/';
+  static const String programImages = '/api/program-images/';
+  static const String uploadProgramImage = '/api/program-images/upload/';
 
   // API Headers
   static Map<String, String> getHeaders({String? token}) {

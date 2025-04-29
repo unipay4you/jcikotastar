@@ -6,6 +6,7 @@ import 'login_screen.dart';
 import 'member_details_screen.dart';
 import 'admin_panel_screen.dart';
 import 'profile_update_screen.dart';
+import 'photo_gallery_screen.dart';
 import '../widgets/jci_logo.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
@@ -57,7 +58,13 @@ class _MainScreenState extends State<MainScreen> {
   final List<Map<String, dynamic>> _quickActions = [
     {'icon': Icons.people, 'label': 'Members', 'color': Colors.blue},
     {'icon': Icons.event, 'label': 'Events', 'color': Colors.green},
-    {'icon': Icons.photo_library, 'label': 'Gallery', 'color': Colors.orange},
+    {
+      'icon': Icons.photo_library,
+      'label': 'Gallery',
+      'color': Colors.orange,
+      'onTap': (context) => Navigator.push(context,
+          MaterialPageRoute(builder: (context) => const PhotoGalleryScreen()))
+    },
     {'icon': Icons.article, 'label': 'News', 'color': Colors.purple},
     {'icon': Icons.contact_phone, 'label': 'Contact', 'color': Colors.red},
   ];
@@ -532,17 +539,22 @@ class _MainScreenState extends State<MainScreen> {
                 children: _quickActions.map((action) {
                   return Column(
                     children: [
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: action['color'].withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          action['icon'],
-                          color: action['color'],
-                          size: 30,
+                      GestureDetector(
+                        onTap: action['onTap'] != null
+                            ? () => action['onTap'](context)
+                            : null,
+                        child: Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: action['color'].withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            action['icon'],
+                            color: action['color'],
+                            size: 30,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -575,30 +587,42 @@ class _MainScreenState extends State<MainScreen> {
                 itemCount: _featuredItems.length,
                 itemBuilder: (context, index) {
                   final item = _featuredItems[index];
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: item['color'].withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    padding: const EdgeInsets.all(15),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          item['icon'],
-                          color: item['color'],
-                          size: 30,
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          item['title'],
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
+                  return GestureDetector(
+                    onTap: () {
+                      if (item['title'] == 'Photo Gallery') {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const PhotoGalleryScreen(),
                           ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
+                        );
+                      }
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: item['color'].withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      padding: const EdgeInsets.all(15),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            item['icon'],
+                            color: item['color'],
+                            size: 30,
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            item['title'],
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 },

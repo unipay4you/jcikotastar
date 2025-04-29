@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 import '../utils/api_logger.dart';
+import '../services/auth_service.dart';
 
 class ApiService {
   static const _timeoutDuration = Duration(seconds: 30);
@@ -185,6 +186,44 @@ class ApiService {
     } catch (e, stackTrace) {
       ApiLogger.logError(error: e.toString(), stackTrace: stackTrace);
       rethrow;
+    }
+  }
+
+  static Future<Map<String, dynamic>> uploadImage({
+    required String endpoint,
+    required File imageFile,
+  }) async {
+    try {
+      final request = http.MultipartRequest(
+          'POST', Uri.parse('${ApiConfig.baseUrl}$endpoint'));
+
+      // Add the image file to the request
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'image',
+          imageFile.path,
+        ),
+      );
+
+      // Add authorization header if token exists
+      final token = await AuthService.getAccessToken();
+      if (token != null) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == ApiConfig.success) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to upload image: ${response.body}');
+      }
+    } catch (e) {
+      return {
+        'status': 500,
+        'message': 'Error uploading image: ${e.toString()}',
+      };
     }
   }
 }

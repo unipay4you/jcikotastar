@@ -5,6 +5,7 @@ import '../services/api_service.dart';
 import '../config/api_config.dart';
 import 'main_screen.dart';
 import 'manage_members_screen.dart';
+import 'program_images_screen.dart';
 
 class AdminPanelScreen extends StatefulWidget {
   const AdminPanelScreen({Key? key}) : super(key: key);
@@ -175,10 +176,15 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                     ),
                     const SizedBox(height: 12),
                     _buildActionButton(
-                      title: 'Manage Chapters',
+                      title: 'Program Images',
                       icon: Icons.business,
                       onTap: () {
-                        // TODO: Navigate to chapter management
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ProgramImagesScreen(),
+                          ),
+                        );
                       },
                     ),
                     const SizedBox(height: 12),

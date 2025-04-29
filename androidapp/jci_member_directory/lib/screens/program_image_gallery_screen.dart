@@ -67,6 +67,8 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
   final ScrollController _scrollController = ScrollController();
   int _currentPage = 0;
   static const int _pageSize = 9; // Number of images per page
+  bool _isSelectionMode = false;
+  Set<String> _selectedImages = {};
 
   @override
   void initState() {
@@ -248,8 +250,14 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
 
   Future<void> _uploadImages() async {
     try {
+      print('Test1: Starting image upload process');
       final List<XFile> images = await _picker.pickMultiImage();
-      if (images.isEmpty) return;
+      print('Test2: Selected ${images.length} images');
+
+      if (images.isEmpty) {
+        print('Test3: No images selected');
+        return;
+      }
 
       setState(() {
         _isLoading = true;
@@ -257,16 +265,21 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
 
       // Get auth token
       final token = await AuthService.getAccessToken();
+      print('Test4: Got auth token');
 
       // Convert all images to base64 with size limit check
       final List<Map<String, String>> imageData = [];
       for (final image in images) {
         try {
+          print('Test5: Processing image: ${image.name}');
           final File imageFile = File(image.path);
           final bytes = await imageFile.readAsBytes();
+          print(
+              'Test6: Image size: ${(bytes.length / (1024 * 1024)).toStringAsFixed(2)}MB');
 
           // Check file size (limit to 10MB)
           if (bytes.length > 10 * 1024 * 1024) {
+            print('Test7: Image too large: ${image.name}');
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -283,22 +296,22 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
           imageData.add({
             'image': base64Image,
           });
-          print(
-              'Processed image: ${image.name} - Size: ${(bytes.length / (1024 * 1024)).toStringAsFixed(2)}MB');
+          print('Test8: Successfully processed image: ${image.name}');
         } catch (e) {
-          print('Error processing image: $e');
+          print('Test9: Error processing image ${image.name}: $e');
           continue;
         }
       }
 
       if (imageData.isEmpty) {
+        print('Test10: No valid images to upload');
         setState(() {
           _isLoading = false;
         });
         return;
       }
 
-      print('Total images to upload: ${imageData.length}');
+      print('Test11: Total images to upload: ${imageData.length}');
 
       // Prepare request body
       final Map<String, dynamic> requestBody = {
@@ -307,7 +320,7 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
 
       // If it's a new folder (ID contains timestamp), add programName and year
       if (widget.folder.id.length > 10) {
-        // Check if it's a timestamp-based ID
+        print('Test12: Adding program details for new folder');
         requestBody['program_id'] = widget.folder.id;
         requestBody['programName'] = widget.folder.name;
         requestBody['year'] = DateTime.now().year.toString();
@@ -315,6 +328,7 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
         requestBody['program_id'] = widget.folder.id;
       }
 
+      print('Test13: Sending upload request');
       // Send all images in a single request
       final response = await ApiService.post(
         endpoint: ApiConfig.uploadProgramImage,
@@ -322,7 +336,9 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
         token: token,
       );
 
+      print('Test14: Upload response status: ${response['status']}');
       if (response['status'] == 200) {
+        print('Test15: Upload successful');
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -335,6 +351,7 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
         _imagesLoaded = false;
         await _loadImages(); // Reload images after upload
       } else {
+        print('Test16: Upload failed: ${response['message']}');
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -344,7 +361,7 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
         );
       }
     } catch (e) {
-      print('Error uploading images: $e');
+      print('Test17: Error in upload process: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -474,6 +491,140 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
     );
   }
 
+  void _toggleSelectionMode() {
+    setState(() {
+      _isSelectionMode = !_isSelectionMode;
+      if (!_isSelectionMode) {
+        _selectedImages.clear();
+      }
+    });
+  }
+
+  void _toggleImageSelection(String imageId) {
+    setState(() {
+      if (_selectedImages.contains(imageId)) {
+        _selectedImages.remove(imageId);
+      } else {
+        _selectedImages.add(imageId);
+      }
+    });
+  }
+
+  Future<void> _deleteSelectedImages() async {
+    if (_selectedImages.isEmpty) return;
+
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      final token = await AuthService.getAccessToken();
+      bool allSuccess = true;
+
+      for (String imageId in _selectedImages) {
+        final response = await ApiService.delete(
+          endpoint:
+              '${ApiConfig.programImages}${widget.folder.id}/images/$imageId/',
+          token: token,
+        );
+
+        if (response['status'] != 200) {
+          allSuccess = false;
+          break;
+        }
+      }
+
+      if (allSuccess) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Selected images deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _selectedImages.clear();
+        _isSelectionMode = false;
+        _imagesLoaded = false;
+        await _loadImages();
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to delete some images'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error deleting images: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _downloadSelectedImages() async {
+    if (_selectedImages.isEmpty) return;
+
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      final directory = await getApplicationDocumentsDirectory();
+      int successCount = 0;
+
+      for (String imageId in _selectedImages) {
+        final image =
+            widget.folder.images.firstWhere((img) => img.id == imageId);
+        try {
+          final bytes = ImageCacheManager.getImage(image.url);
+          if (bytes != null) {
+            final fileName =
+                '${DateTime.now().millisecondsSinceEpoch}_$imageId.jpg';
+            final file = File('${directory.path}/$fileName');
+            await file.writeAsBytes(bytes);
+            successCount++;
+          }
+        } catch (e) {
+          print('Error downloading image $imageId: $e');
+        }
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Successfully downloaded $successCount of ${_selectedImages.length} images'),
+          backgroundColor: successCount > 0 ? Colors.green : Colors.red,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error downloading images: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -484,6 +635,28 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
+        actions: [
+          if (_isSelectionMode) ...[
+            IconButton(
+              icon: const Icon(Icons.download),
+              onPressed:
+                  _selectedImages.isEmpty ? null : _downloadSelectedImages,
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete),
+              onPressed: _selectedImages.isEmpty ? null : _deleteSelectedImages,
+            ),
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: _toggleSelectionMode,
+            ),
+          ] else ...[
+            IconButton(
+              icon: const Icon(Icons.select_all),
+              onPressed: _toggleSelectionMode,
+            ),
+          ],
+        ],
       ),
       body: _isLoading && _currentPage == 0
           ? const Center(child: CircularProgressIndicator())
@@ -526,7 +699,19 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
                   itemBuilder: (context, index) {
                     final image = widget.folder.images[index];
                     return GestureDetector(
-                      onTap: () => _showFullScreenImage(context, image.url),
+                      onTap: () {
+                        if (_isSelectionMode) {
+                          _toggleImageSelection(image.id);
+                        } else {
+                          _showFullScreenImage(context, image.url);
+                        }
+                      },
+                      onLongPress: () {
+                        if (!_isSelectionMode) {
+                          _toggleSelectionMode();
+                          _toggleImageSelection(image.id);
+                        }
+                      },
                       child: Stack(
                         children: [
                           ClipRRect(
@@ -560,6 +745,32 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
                                     },
                                   ),
                           ),
+                          if (_isSelectionMode)
+                            Positioned(
+                              top: 4,
+                              left: 4,
+                              child: Container(
+                                width: 24,
+                                height: 24,
+                                decoration: BoxDecoration(
+                                  color: _selectedImages.contains(image.id)
+                                      ? Colors.blue
+                                      : Colors.white,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.blue,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: _selectedImages.contains(image.id)
+                                    ? const Icon(
+                                        Icons.check,
+                                        color: Colors.white,
+                                        size: 16,
+                                      )
+                                    : null,
+                              ),
+                            ),
                           // Image size overlay
                           Positioned(
                             bottom: 4,
@@ -581,27 +792,30 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
                               ),
                             ),
                           ),
-                          // Delete button
-                          Positioned(
-                            top: 4,
-                            right: 4,
-                            child: IconButton(
-                              icon: const Icon(
-                                Icons.delete,
-                                color: Colors.red,
+                          // Delete button (only show when not in selection mode)
+                          if (!_isSelectionMode)
+                            Positioned(
+                              top: 4,
+                              right: 4,
+                              child: IconButton(
+                                icon: const Icon(
+                                  Icons.delete,
+                                  color: Colors.red,
+                                ),
+                                onPressed: () => _deleteImage(image.id),
                               ),
-                              onPressed: () => _deleteImage(image.id),
                             ),
-                          ),
                         ],
                       ),
                     );
                   },
                 ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _uploadImages,
-        child: const Icon(Icons.add_photo_alternate),
-      ),
+      floatingActionButton: _isSelectionMode
+          ? null
+          : FloatingActionButton(
+              onPressed: _uploadImages,
+              child: const Icon(Icons.add_photo_alternate),
+            ),
     );
   }
 }

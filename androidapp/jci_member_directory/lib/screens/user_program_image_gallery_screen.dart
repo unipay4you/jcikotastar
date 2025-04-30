@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:photo_view/photo_view.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:ui';
 import 'dart:async';
 import '../services/api_service.dart';
 import '../config/api_config.dart';
@@ -17,17 +14,17 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart';
 
-class ProgramImageGalleryScreen extends StatefulWidget {
+class UserProgramImageGalleryScreen extends StatefulWidget {
   final ProgramFolder folder;
 
-  const ProgramImageGalleryScreen({
+  const UserProgramImageGalleryScreen({
     Key? key,
     required this.folder,
   }) : super(key: key);
 
   @override
-  _ProgramImageGalleryScreenState createState() =>
-      _ProgramImageGalleryScreenState();
+  _UserProgramImageGalleryScreenState createState() =>
+      _UserProgramImageGalleryScreenState();
 }
 
 // Static cache to maintain data across screen lifecycle
@@ -61,9 +58,9 @@ class ImageCacheManager {
   }
 }
 
-class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
+class _UserProgramImageGalleryScreenState
+    extends State<UserProgramImageGalleryScreen> {
   bool _isLoading = false;
-  final ImagePicker _picker = ImagePicker();
   bool _imagesLoaded = false;
   final ScrollController _scrollController = ScrollController();
   int _currentPage = 0;
@@ -85,7 +82,6 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
   void dispose() {
     _scrollController.removeListener(_scrollListener);
     _scrollController.dispose();
-    // Clear cache when screen is disposed
     ImageCacheManager.clearCache();
     super.dispose();
   }
@@ -98,7 +94,6 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
   }
 
   Future<void> _loadImages() async {
-    // If images are already loaded, don't reload
     if (_imagesLoaded) {
       print('Images already loaded, skipping reload');
       return;
@@ -125,9 +120,7 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
             'Successfully loaded ${(response['payload'] as List).length} images');
         setState(() {
           widget.folder.images = (response['payload'] as List).map((image) {
-            // Get the image path from the response
             final String imagePath = image['image'];
-            // Construct the full URL by adding base URL if it's a relative path
             final String fullUrl = imagePath.startsWith('http')
                 ? imagePath
                 : '${ApiConfig.baseUrl}${imagePath.startsWith('/') ? imagePath.substring(1) : imagePath}';
@@ -141,7 +134,7 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
               createdAt: DateTime.now(),
             );
           }).toList();
-          _imagesLoaded = true; // Set flag to true after successful load
+          _imagesLoaded = true;
         });
       } else {
         print('Failed to load images: ${response['message']}');
@@ -186,7 +179,6 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
           ? widget.folder.images.length
           : startIndex + _pageSize;
 
-      // Load images for the next page
       for (int i = startIndex; i < endIndex; i++) {
         final image = widget.folder.images[i];
         if (!ImageCacheManager.hasImage(image.url)) {
@@ -231,387 +223,29 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
     }
   }
 
-  Future<String> _getImageSize(String imageUrl) async {
-    if (ImageCacheManager.hasImage(imageUrl)) {
-      return ImageCacheManager.getSize(imageUrl)!;
-    }
-
-    try {
-      final response = await http.get(Uri.parse(imageUrl));
-      if (response.statusCode == 200) {
-        final size = _formatFileSize(response.bodyBytes.length);
-        ImageCacheManager.cacheSize(imageUrl, size);
-        return size;
-      }
-    } catch (e) {
-      print('Error getting image size: $e');
-    }
-    return '0B';
-  }
-
-  Future<void> _uploadImages() async {
-    try {
-      print('Test1: Starting image upload process');
-      final List<XFile> images = await _picker.pickMultiImage();
-      print('Test2: Selected ${images.length} images');
-
-      if (images.isEmpty) {
-        print('Test3: No images selected');
-        return;
-      }
-
-      setState(() {
-        _isLoading = true;
-      });
-
-      // Get auth token
-      final token = await AuthService.getAccessToken();
-      print('Test4: Got auth token');
-
-      // Convert all images to base64 with size limit check
-      final List<Map<String, String>> imageData = [];
-      for (final image in images) {
-        try {
-          print('Test5: Processing image: ${image.name}');
-          final File imageFile = File(image.path);
-          final bytes = await imageFile.readAsBytes();
-          print(
-              'Test6: Image size: ${(bytes.length / (1024 * 1024)).toStringAsFixed(2)}MB');
-
-          // Check file size (limit to 10MB)
-          if (bytes.length > 10 * 1024 * 1024) {
-            print('Test7: Image too large: ${image.name}');
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                    'Image ${image.name} is too large. Maximum size is 10MB'),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 3),
-              ),
-            );
-            continue;
-          }
-
-          final base64Image = base64Encode(bytes);
-          imageData.add({
-            'image': base64Image,
-          });
-          print('Test8: Successfully processed image: ${image.name}');
-        } catch (e) {
-          print('Test9: Error processing image ${image.name}: $e');
-          continue;
-        }
-      }
-
-      if (imageData.isEmpty) {
-        print('Test10: No valid images to upload');
-        setState(() {
-          _isLoading = false;
-        });
-        return;
-      }
-
-      print('Test11: Total images to upload: ${imageData.length}');
-
-      // Prepare request body
-      final Map<String, dynamic> requestBody = {
-        'images': imageData,
-      };
-
-      // If it's a new folder (ID contains timestamp), add programName and year
-      if (widget.folder.id.length > 10) {
-        print('Test12: Adding program details for new folder');
-        requestBody['program_id'] = widget.folder.id;
-        requestBody['programName'] = widget.folder.name;
-        requestBody['year'] = DateTime.now().year.toString();
-      } else {
-        requestBody['program_id'] = widget.folder.id;
-      }
-
-      print('Test13: Sending upload request');
-      // Send all images in a single request
-      final response = await ApiService.post(
-        endpoint: ApiConfig.uploadProgramImage,
-        body: requestBody,
-        token: token,
-      );
-
-      print('Test14: Upload response status: ${response['status']}');
-      if (response['status'] == 200) {
-        print('Test15: Upload successful');
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Images uploaded successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        // Reset the loaded flag to force a refresh
-        _imagesLoaded = false;
-        await _loadImages(); // Reload images after upload
-      } else {
-        print('Test16: Upload failed: ${response['message']}');
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(response['message'] ?? 'Failed to upload images'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      print('Test17: Error in upload process: $e');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error uploading images: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _deleteImage(String imageId) async {
-    try {
-      setState(() {
-        _isLoading = true;
-      });
-
-      final token = await AuthService.getAccessToken();
-      final response = await ApiService.delete(
-        endpoint:
-            '${ApiConfig.programImages}${widget.folder.id}/images/$imageId/',
-        token: token,
-      );
-
-      if (response['status'] == 200) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Image deleted successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(response['message'] ?? 'Failed to delete image'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error deleting image: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  void _showFullScreenImage(BuildContext context, String imageUrl) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => Scaffold(
-          appBar: AppBar(
-            title: Text(
-              'Image View',
-              style: GoogleFonts.poppins(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.download),
-                onPressed: () async {
-                  try {
-                    final bytes = ImageCacheManager.getImage(imageUrl);
-                    if (bytes != null) {
-                      final directory =
-                          await getApplicationDocumentsDirectory();
-                      final fileName =
-                          '${DateTime.now().millisecondsSinceEpoch}.jpg';
-                      final file = File('${directory.path}/$fileName');
-                      await file.writeAsBytes(bytes);
-
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Image downloaded successfully'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error downloading image: $e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                },
-              ),
-            ],
-          ),
-          body: PhotoView(
-            imageProvider: ImageCacheManager.hasImage(imageUrl)
-                ? MemoryImage(ImageCacheManager.getImage(imageUrl)!)
-                    as ImageProvider
-                : CachedNetworkImageProvider(imageUrl),
-            minScale: PhotoViewComputedScale.contained,
-            maxScale: PhotoViewComputedScale.covered * 2,
-            backgroundDecoration: BoxDecoration(
-              color: Colors.black,
-            ),
-            loadingBuilder: (context, event) => const Center(
-              child: CircularProgressIndicator(),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   void _toggleSelectionMode() {
-    print(
-        'Selection1: Toggling selection mode from $_isSelectionMode to ${!_isSelectionMode}');
     setState(() {
       _isSelectionMode = !_isSelectionMode;
       if (!_isSelectionMode) {
-        print(
-            'Selection2: Clearing selected images, count: ${_selectedImages.length}');
         _selectedImages.clear();
       }
     });
   }
 
   void _toggleImageSelection(String imageId) {
-    print('Selection3: Toggling image selection for ID: $imageId');
     setState(() {
       if (_selectedImages.contains(imageId)) {
-        print('Selection4: Removing image from selection');
         _selectedImages.remove(imageId);
       } else {
-        print('Selection5: Adding image to selection');
         _selectedImages.add(imageId);
       }
-      print(
-          'Selection6: Current selected images count: ${_selectedImages.length}');
     });
   }
 
-  Future<void> _deleteSelectedImages() async {
-    if (_selectedImages.isEmpty) {
-      print('Delete1: No images selected for deletion');
-      return;
-    }
-
-    print('Delete2: Starting deletion of ${_selectedImages.length} images');
-    try {
-      setState(() {
-        _isLoading = true;
-      });
-
-      final token = await AuthService.getAccessToken();
-      print('Delete3: Got auth token');
-      bool allSuccess = true;
-
-      for (String imageId in _selectedImages) {
-        print('Delete4: Deleting image ID: $imageId');
-        final response = await ApiService.delete(
-          endpoint:
-              '${ApiConfig.programImages}${widget.folder.id}/images/$imageId/',
-          token: token,
-        );
-
-        if (response['status'] != 200) {
-          print(
-              'Delete5: Failed to delete image $imageId: ${response['message']}');
-          allSuccess = false;
-          break;
-        } else {
-          print('Delete6: Successfully deleted image $imageId');
-        }
-      }
-
-      if (allSuccess) {
-        print('Delete7: All images deleted successfully');
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Selected images deleted successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        _selectedImages.clear();
-        _isSelectionMode = false;
-        _imagesLoaded = false;
-        await _loadImages();
-      } else {
-        print('Delete8: Some images failed to delete');
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to delete some images'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      print('Delete9: Error in deletion process: $e');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error deleting images: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
   Future<void> _downloadSelectedImages() async {
-    print('\n=== DOWNLOAD PROCESS STARTED ===');
-    if (_selectedImages.isEmpty) {
-      print('Line 1: No images selected for download');
-      return;
-    }
-
-    print('Line 2: Number of images selected: ${_selectedImages.length}');
-    print('\nLine 3: Selected Image Details:');
-    for (String imageId in _selectedImages) {
-      final image = widget.folder.images.firstWhere((img) => img.id == imageId);
-      print('Line 3.1: Image ID: $imageId');
-      print('Line 3.2: Image URL: ${image.url}');
-    }
+    if (_selectedImages.isEmpty) return;
 
     try {
-      print('\nLine 4: Setting loading state to true');
       setState(() {
         _isLoading = true;
       });
@@ -619,14 +253,10 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
       // Create JCIKotaStar directory in Pictures folder
       final picturesDir = Directory('/storage/emulated/0/Pictures/JCIKotaStar');
       if (!await picturesDir.exists()) {
-        print('Line 5.1: Creating JCIKotaStar directory');
         await picturesDir.create(recursive: true);
       }
 
-      print('Line 6: Download directory path: ${picturesDir.path}');
-
       int successCount = 0;
-      print('\nLine 7: Starting image download loop');
 
       // Show progress dialog
       showDialog(
@@ -662,27 +292,20 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
       );
 
       for (String imageId in _selectedImages) {
-        print('\nLine 8: Processing image ID: $imageId');
         final image =
             widget.folder.images.firstWhere((img) => img.id == imageId);
         try {
-          print('Line 9: Downloading image from URL: ${image.url}');
           final response = await http.get(Uri.parse(image.url));
 
           if (response.statusCode == 200) {
-            print('Line 10: Image downloaded successfully');
             final bytes = response.bodyBytes;
-
-            // Create filename with timestamp and original extension
             final extension = image.url.split('.').last;
             final fileName =
                 'JCI_${DateTime.now().millisecondsSinceEpoch}_$imageId.$extension';
             final file = File('${picturesDir.path}/$fileName');
 
-            print('Line 11: Creating file at: ${file.path}');
             await file.writeAsBytes(bytes);
             successCount++;
-            print('Line 12: Successfully saved image: $fileName');
 
             // Update progress dialog
             if (mounted) {
@@ -720,33 +343,19 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
               );
             }
 
-            // Notify media scanner to make the image visible in gallery
-            print('Line 13: Notifying media scanner');
             await _notifyMediaScanner(file.path);
-          } else {
-            print(
-                'Line 14: Failed to download image. Status code: ${response.statusCode}');
           }
         } catch (e) {
-          print('Line 15: Error downloading image $imageId: $e');
+          print('Error downloading image $imageId: $e');
         }
       }
-
-      print('\nLine 16: Download process completed');
-      print('Line 17: Successfully downloaded: $successCount images');
-      print('Line 18: Total images attempted: ${_selectedImages.length}');
 
       // Close the progress dialog
       if (mounted) {
         Navigator.of(context).pop();
       }
 
-      if (!mounted) {
-        print('Line 19: Widget not mounted, skipping UI update');
-        return;
-      }
-
-      print('Line 20: Showing download result snackbar');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -755,16 +364,16 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
           duration: const Duration(seconds: 5),
         ),
       );
+
+      setState(() {
+        _selectedImages.clear();
+        _isSelectionMode = false;
+      });
     } catch (e) {
-      print('\nLine 21: Error in download process: $e');
       if (mounted) {
         Navigator.of(context).pop(); // Close progress dialog if open
       }
-      if (!mounted) {
-        print('Line 22: Widget not mounted, skipping error UI update');
-        return;
-      }
-      print('Line 23: Showing error snackbar');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error downloading images: ${e.toString()}'),
@@ -773,12 +382,10 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
       );
     } finally {
       if (mounted) {
-        print('Line 24: Setting loading state to false');
         setState(() {
           _isLoading = false;
         });
       }
-      print('=== DOWNLOAD PROCESS COMPLETED ===\n');
     }
   }
 
@@ -786,16 +393,84 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
     try {
       const platform = MethodChannel('com.example.jci_member_directory/media');
       await platform.invokeMethod('scanFile', {'path': filePath});
-      print('Media scanner notified for: $filePath');
-
-      // Add a small delay to ensure the media scanner has time to process
       await Future.delayed(const Duration(milliseconds: 500));
-
-      // Force a media scan refresh
       await platform.invokeMethod('refreshGallery');
     } catch (e) {
       print('Error notifying media scanner: $e');
     }
+  }
+
+  void _showFullScreenImage(BuildContext context, String imageUrl) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            title: Text(
+              'Image View',
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.download),
+                onPressed: () async {
+                  try {
+                    final bytes = ImageCacheManager.getImage(imageUrl);
+                    if (bytes != null) {
+                      final picturesDir =
+                          Directory('/storage/emulated/0/Pictures/JCIKotaStar');
+                      if (!await picturesDir.exists()) {
+                        await picturesDir.create(recursive: true);
+                      }
+
+                      final extension = imageUrl.split('.').last;
+                      final fileName =
+                          'JCI_${DateTime.now().millisecondsSinceEpoch}.$extension';
+                      final file = File('${picturesDir.path}/$fileName');
+                      await file.writeAsBytes(bytes);
+
+                      await _notifyMediaScanner(file.path);
+
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Image downloaded successfully'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error downloading image: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+          body: PhotoView(
+            imageProvider: ImageCacheManager.hasImage(imageUrl)
+                ? MemoryImage(ImageCacheManager.getImage(imageUrl)!)
+                    as ImageProvider
+                : CachedNetworkImageProvider(imageUrl),
+            minScale: PhotoViewComputedScale.contained,
+            maxScale: PhotoViewComputedScale.covered * 2,
+            backgroundDecoration: const BoxDecoration(
+              color: Colors.black,
+            ),
+            loadingBuilder: (context, event) => const Center(
+              child: CircularProgressIndicator(),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -839,10 +514,6 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
                   _selectedImages.isEmpty ? null : _downloadSelectedImages,
             ),
             IconButton(
-              icon: const Icon(Icons.delete),
-              onPressed: _selectedImages.isEmpty ? null : _deleteSelectedImages,
-            ),
-            IconButton(
               icon: const Icon(Icons.close),
               onPressed: _toggleSelectionMode,
             ),
@@ -873,12 +544,6 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
                           fontSize: 16,
                           color: Colors.grey[600],
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      ElevatedButton.icon(
-                        onPressed: _uploadImages,
-                        icon: const Icon(Icons.add_photo_alternate),
-                        label: const Text('Add Images'),
                       ),
                     ],
                   ),
@@ -967,7 +632,6 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
                                     : null,
                               ),
                             ),
-                          // Image size overlay
                           Positioned(
                             bottom: 4,
                             left: 4,
@@ -988,30 +652,11 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
                               ),
                             ),
                           ),
-                          // Delete button (only show when not in selection mode)
-                          if (!_isSelectionMode)
-                            Positioned(
-                              top: 4,
-                              right: 4,
-                              child: IconButton(
-                                icon: const Icon(
-                                  Icons.delete,
-                                  color: Colors.red,
-                                ),
-                                onPressed: () => _deleteImage(image.id),
-                              ),
-                            ),
                         ],
                       ),
                     );
                   },
                 ),
-      floatingActionButton: _isSelectionMode
-          ? null
-          : FloatingActionButton(
-              onPressed: _uploadImages,
-              child: const Icon(Icons.add_photo_alternate),
-            ),
     );
   }
 }

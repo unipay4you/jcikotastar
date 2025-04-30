@@ -15,6 +15,7 @@ import '../config/api_config.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:jci_member_directory/screens/user_program_images_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
@@ -62,8 +63,10 @@ class _MainScreenState extends State<MainScreen> {
       'icon': Icons.photo_library,
       'label': 'Gallery',
       'color': Colors.orange,
-      'onTap': (context) => Navigator.push(context,
-          MaterialPageRoute(builder: (context) => const PhotoGalleryScreen()))
+      'onTap': (context) => Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (context) => const UserProgramImagesScreen()))
     },
     {'icon': Icons.article, 'label': 'News', 'color': Colors.purple},
     {'icon': Icons.contact_phone, 'label': 'Contact', 'color': Colors.red},
@@ -593,7 +596,8 @@ class _MainScreenState extends State<MainScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const PhotoGalleryScreen(),
+                            builder: (context) =>
+                                const UserProgramImagesScreen(),
                           ),
                         );
                       }

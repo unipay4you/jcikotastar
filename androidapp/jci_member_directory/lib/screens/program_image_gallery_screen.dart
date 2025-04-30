@@ -616,29 +616,14 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
         _isLoading = true;
       });
 
-      print('Line 5: Getting external storage directory');
-      final directory = await getExternalStorageDirectory();
-      if (directory == null) {
-        print('Line 5.1: Failed to get external storage directory');
-        throw Exception('External storage not available');
-      }
-
-      // Create app-specific directory in Pictures folder
-      final picturesDir =
-          Directory('/storage/emulated/0/Pictures/JCI_Member_Directory');
+      // Create JCIKotaStar directory in Pictures folder
+      final picturesDir = Directory('/storage/emulated/0/Pictures/JCIKotaStar');
       if (!await picturesDir.exists()) {
-        print('Line 5.2: Creating app directory in Pictures');
+        print('Line 5.1: Creating JCIKotaStar directory');
         await picturesDir.create(recursive: true);
       }
 
-      // Create folder for current program
-      final programDir = Directory('${picturesDir.path}/${widget.folder.name}');
-      if (!await programDir.exists()) {
-        print('Line 5.3: Creating program directory: ${widget.folder.name}');
-        await programDir.create(recursive: true);
-      }
-
-      print('Line 6: Download directory path: ${programDir.path}');
+      print('Line 6: Download directory path: ${picturesDir.path}');
 
       int successCount = 0;
       print('\nLine 7: Starting image download loop');
@@ -658,8 +643,8 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
             // Create filename with timestamp and original extension
             final extension = image.url.split('.').last;
             final fileName =
-                '${DateTime.now().millisecondsSinceEpoch}_$imageId.$extension';
-            final file = File('${programDir.path}/$fileName');
+                'JCI_${DateTime.now().millisecondsSinceEpoch}_$imageId.$extension';
+            final file = File('${picturesDir.path}/$fileName');
 
             print('Line 11: Creating file at: ${file.path}');
             await file.writeAsBytes(bytes);
@@ -691,7 +676,7 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-              'Successfully downloaded $successCount of ${_selectedImages.length} images to gallery'),
+              'Successfully downloaded $successCount of ${_selectedImages.length} images to JCIKotaStar folder'),
           backgroundColor: successCount > 0 ? Colors.green : Colors.red,
           duration: const Duration(seconds: 5),
         ),
@@ -725,6 +710,12 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
       const platform = MethodChannel('com.example.jci_member_directory/media');
       await platform.invokeMethod('scanFile', {'path': filePath});
       print('Media scanner notified for: $filePath');
+
+      // Add a small delay to ensure the media scanner has time to process
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Force a media scan refresh
+      await platform.invokeMethod('refreshGallery');
     } catch (e) {
       print('Error notifying media scanner: $e');
     }

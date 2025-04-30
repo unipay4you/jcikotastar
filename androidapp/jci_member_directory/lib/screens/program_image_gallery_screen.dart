@@ -15,6 +15,7 @@ import '../models/program_folder.dart';
 import '../services/auth_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter/services.dart';
 
 class ProgramImageGalleryScreen extends StatefulWidget {
   final ProgramFolder folder;
@@ -492,36 +493,51 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
   }
 
   void _toggleSelectionMode() {
+    print(
+        'Selection1: Toggling selection mode from $_isSelectionMode to ${!_isSelectionMode}');
     setState(() {
       _isSelectionMode = !_isSelectionMode;
       if (!_isSelectionMode) {
+        print(
+            'Selection2: Clearing selected images, count: ${_selectedImages.length}');
         _selectedImages.clear();
       }
     });
   }
 
   void _toggleImageSelection(String imageId) {
+    print('Selection3: Toggling image selection for ID: $imageId');
     setState(() {
       if (_selectedImages.contains(imageId)) {
+        print('Selection4: Removing image from selection');
         _selectedImages.remove(imageId);
       } else {
+        print('Selection5: Adding image to selection');
         _selectedImages.add(imageId);
       }
+      print(
+          'Selection6: Current selected images count: ${_selectedImages.length}');
     });
   }
 
   Future<void> _deleteSelectedImages() async {
-    if (_selectedImages.isEmpty) return;
+    if (_selectedImages.isEmpty) {
+      print('Delete1: No images selected for deletion');
+      return;
+    }
 
+    print('Delete2: Starting deletion of ${_selectedImages.length} images');
     try {
       setState(() {
         _isLoading = true;
       });
 
       final token = await AuthService.getAccessToken();
+      print('Delete3: Got auth token');
       bool allSuccess = true;
 
       for (String imageId in _selectedImages) {
+        print('Delete4: Deleting image ID: $imageId');
         final response = await ApiService.delete(
           endpoint:
               '${ApiConfig.programImages}${widget.folder.id}/images/$imageId/',
@@ -529,12 +545,17 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
         );
 
         if (response['status'] != 200) {
+          print(
+              'Delete5: Failed to delete image $imageId: ${response['message']}');
           allSuccess = false;
           break;
+        } else {
+          print('Delete6: Successfully deleted image $imageId');
         }
       }
 
       if (allSuccess) {
+        print('Delete7: All images deleted successfully');
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -547,6 +568,7 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
         _imagesLoaded = false;
         await _loadImages();
       } else {
+        print('Delete8: Some images failed to delete');
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -556,6 +578,7 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
         );
       }
     } catch (e) {
+      print('Delete9: Error in deletion process: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -573,43 +596,113 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
   }
 
   Future<void> _downloadSelectedImages() async {
-    if (_selectedImages.isEmpty) return;
+    print('\n=== DOWNLOAD PROCESS STARTED ===');
+    if (_selectedImages.isEmpty) {
+      print('Line 1: No images selected for download');
+      return;
+    }
+
+    print('Line 2: Number of images selected: ${_selectedImages.length}');
+    print('\nLine 3: Selected Image Details:');
+    for (String imageId in _selectedImages) {
+      final image = widget.folder.images.firstWhere((img) => img.id == imageId);
+      print('Line 3.1: Image ID: $imageId');
+      print('Line 3.2: Image URL: ${image.url}');
+    }
 
     try {
+      print('\nLine 4: Setting loading state to true');
       setState(() {
         _isLoading = true;
       });
 
-      final directory = await getApplicationDocumentsDirectory();
+      print('Line 5: Getting external storage directory');
+      final directory = await getExternalStorageDirectory();
+      if (directory == null) {
+        print('Line 5.1: Failed to get external storage directory');
+        throw Exception('External storage not available');
+      }
+
+      // Create app-specific directory in Pictures folder
+      final picturesDir =
+          Directory('/storage/emulated/0/Pictures/JCI_Member_Directory');
+      if (!await picturesDir.exists()) {
+        print('Line 5.2: Creating app directory in Pictures');
+        await picturesDir.create(recursive: true);
+      }
+
+      // Create folder for current program
+      final programDir = Directory('${picturesDir.path}/${widget.folder.name}');
+      if (!await programDir.exists()) {
+        print('Line 5.3: Creating program directory: ${widget.folder.name}');
+        await programDir.create(recursive: true);
+      }
+
+      print('Line 6: Download directory path: ${programDir.path}');
+
       int successCount = 0;
+      print('\nLine 7: Starting image download loop');
 
       for (String imageId in _selectedImages) {
+        print('\nLine 8: Processing image ID: $imageId');
         final image =
             widget.folder.images.firstWhere((img) => img.id == imageId);
         try {
-          final bytes = ImageCacheManager.getImage(image.url);
-          if (bytes != null) {
+          print('Line 9: Downloading image from URL: ${image.url}');
+          final response = await http.get(Uri.parse(image.url));
+
+          if (response.statusCode == 200) {
+            print('Line 10: Image downloaded successfully');
+            final bytes = response.bodyBytes;
+
+            // Create filename with timestamp and original extension
+            final extension = image.url.split('.').last;
             final fileName =
-                '${DateTime.now().millisecondsSinceEpoch}_$imageId.jpg';
-            final file = File('${directory.path}/$fileName');
+                '${DateTime.now().millisecondsSinceEpoch}_$imageId.$extension';
+            final file = File('${programDir.path}/$fileName');
+
+            print('Line 11: Creating file at: ${file.path}');
             await file.writeAsBytes(bytes);
             successCount++;
+            print('Line 12: Successfully saved image: $fileName');
+
+            // Notify media scanner to make the image visible in gallery
+            print('Line 13: Notifying media scanner');
+            await _notifyMediaScanner(file.path);
+          } else {
+            print(
+                'Line 14: Failed to download image. Status code: ${response.statusCode}');
           }
         } catch (e) {
-          print('Error downloading image $imageId: $e');
+          print('Line 15: Error downloading image $imageId: $e');
         }
       }
 
-      if (!mounted) return;
+      print('\nLine 16: Download process completed');
+      print('Line 17: Successfully downloaded: $successCount images');
+      print('Line 18: Total images attempted: ${_selectedImages.length}');
+
+      if (!mounted) {
+        print('Line 19: Widget not mounted, skipping UI update');
+        return;
+      }
+
+      print('Line 20: Showing download result snackbar');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-              'Successfully downloaded $successCount of ${_selectedImages.length} images'),
+              'Successfully downloaded $successCount of ${_selectedImages.length} images to gallery'),
           backgroundColor: successCount > 0 ? Colors.green : Colors.red,
+          duration: const Duration(seconds: 5),
         ),
       );
     } catch (e) {
-      if (!mounted) return;
+      print('\nLine 21: Error in download process: $e');
+      if (!mounted) {
+        print('Line 22: Widget not mounted, skipping error UI update');
+        return;
+      }
+      print('Line 23: Showing error snackbar');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error downloading images: ${e.toString()}'),
@@ -618,10 +711,22 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
       );
     } finally {
       if (mounted) {
+        print('Line 24: Setting loading state to false');
         setState(() {
           _isLoading = false;
         });
       }
+      print('=== DOWNLOAD PROCESS COMPLETED ===\n');
+    }
+  }
+
+  Future<void> _notifyMediaScanner(String filePath) async {
+    try {
+      const platform = MethodChannel('com.example.jci_member_directory/media');
+      await platform.invokeMethod('scanFile', {'path': filePath});
+      print('Media scanner notified for: $filePath');
+    } catch (e) {
+      print('Error notifying media scanner: $e');
     }
   }
 

@@ -14,19 +14,8 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
-
-class UserProgramImageGalleryScreen extends StatefulWidget {
-  final ProgramFolder folder;
-
-  const UserProgramImageGalleryScreen({
-    Key? key,
-    required this.folder,
-  }) : super(key: key);
-
-  @override
-  _UserProgramImageGalleryScreenState createState() =>
-      _UserProgramImageGalleryScreenState();
-}
+import 'package:android_intent_plus/android_intent.dart';
+import 'package:android_intent_plus/flag.dart';
 
 // Static cache to maintain data across screen lifecycle
 class ImageCacheManager {
@@ -57,6 +46,19 @@ class ImageCacheManager {
     _imageCache.clear();
     _sizeCache.clear();
   }
+}
+
+class UserProgramImageGalleryScreen extends StatefulWidget {
+  final ProgramFolder folder;
+
+  const UserProgramImageGalleryScreen({
+    Key? key,
+    required this.folder,
+  }) : super(key: key);
+
+  @override
+  _UserProgramImageGalleryScreenState createState() =>
+      _UserProgramImageGalleryScreenState();
 }
 
 class _UserProgramImageGalleryScreenState
@@ -263,29 +265,69 @@ class _UserProgramImageGalleryScreenState
       showDialog(
         context: context,
         barrierDismissible: false,
+        barrierColor: Colors.transparent, // Fully transparent background
         builder: (BuildContext context) {
           return StatefulBuilder(
             builder: (context, setState) {
-              return AlertDialog(
-                title: Text(
-                  'Downloading Images',
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w600,
+              return Stack(
+                children: [
+                  // Semi-transparent overlay
+                  Positioned.fill(
+                    child: Container(
+                      color: Colors.black.withOpacity(0.2),
+                    ),
                   ),
-                ),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    LinearProgressIndicator(
-                      value: successCount / _selectedImages.length,
+                  // Progress dialog
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 40),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 10,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Downloading Images',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 18,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: successCount / _selectedImages.length,
+                              backgroundColor: Colors.grey[200],
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.blue),
+                              minHeight: 8,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Downloaded $successCount out of ${_selectedImages.length} images',
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Downloaded $successCount out of ${_selectedImages.length} images',
-                      style: GoogleFonts.poppins(),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               );
             },
           );
@@ -314,29 +356,72 @@ class _UserProgramImageGalleryScreenState
               showDialog(
                 context: context,
                 barrierDismissible: false,
+                barrierColor:
+                    Colors.transparent, // Fully transparent background
                 builder: (BuildContext context) {
                   return StatefulBuilder(
                     builder: (context, setState) {
-                      return AlertDialog(
-                        title: Text(
-                          'Downloading Images',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w600,
+                      return Stack(
+                        children: [
+                          // Semi-transparent overlay
+                          Positioned.fill(
+                            child: Container(
+                              color: Colors.black.withOpacity(0.2),
+                            ),
                           ),
-                        ),
-                        content: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            LinearProgressIndicator(
-                              value: successCount / _selectedImages.length,
+                          // Progress dialog
+                          Center(
+                            child: Container(
+                              margin:
+                                  const EdgeInsets.symmetric(horizontal: 40),
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.8),
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 10,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Downloading Images',
+                                    style: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 18,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: LinearProgressIndicator(
+                                      value:
+                                          successCount / _selectedImages.length,
+                                      backgroundColor: Colors.grey[200],
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.blue),
+                                      minHeight: 8,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Downloaded $successCount out of ${_selectedImages.length} images',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 14,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Downloaded $successCount out of ${_selectedImages.length} images',
-                              style: GoogleFonts.poppins(),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       );
                     },
                   );
@@ -357,10 +442,88 @@ class _UserProgramImageGalleryScreenState
       }
 
       if (!mounted) return;
+
+      // Show final success message with Open Gallery button
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-              'Successfully downloaded $successCount of ${_selectedImages.length} images to JCIKotaStar folder'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Successfully downloaded $successCount of ${_selectedImages.length} images',
+                style: const TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () async {
+                    print('\n=== Opening Gallery Process ===');
+                    try {
+                      // Try to open Google Photos Collections tab
+                      print('Attempting to open Google Photos Collections...');
+                      final googlePhotosIntent = AndroidIntent(
+                          action: 'android.intent.action.VIEW',
+                          data:
+                              'content://com.google.android.apps.photos.contentprovider/0/1/content://media/external/images/media',
+                          type: 'image/*',
+                          flags: [Flag.FLAG_ACTIVITY_NEW_TASK],
+                          package: 'com.google.android.apps.photos',
+                          arguments: {
+                            'android.intent.extra.TITLE': 'JCIKotaStar',
+                            'android.intent.extra.SUBJECT': 'JCIKotaStar',
+                            'android.intent.extra.TEXT': 'JCIKotaStar',
+                            'android.intent.extra.TIMESTAMP':
+                                DateTime.now().millisecondsSinceEpoch
+                          });
+
+                      try {
+                        print('Launching Google Photos intent...');
+                        await googlePhotosIntent.launch();
+                        print('Google Photos intent launched successfully');
+                        return;
+                      } catch (e) {
+                        print(
+                            'Google Photos not available, falling back to system gallery...');
+                      }
+
+                      // Fallback to system gallery
+                      print('Attempting to open system gallery...');
+                      final galleryIntent = AndroidIntent(
+                          action: 'android.intent.action.VIEW',
+                          data:
+                              'content://com.android.externalstorage.documents/root/primary/Pictures/JCIKotaStar',
+                          type: 'image/*',
+                          flags: [Flag.FLAG_ACTIVITY_NEW_TASK]);
+
+                      print('Launching system gallery intent...');
+                      await galleryIntent.launch();
+                      print('System gallery intent launched successfully');
+                    } catch (e) {
+                      print('Error opening gallery: $e');
+                      print('Error stack trace: ${StackTrace.current}');
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error opening gallery: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                    print('=== Gallery Opening Process Ended ===\n');
+                  },
+                  child: const Text(
+                    'OPEN GALLERY',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
           backgroundColor: successCount > 0 ? Colors.green : Colors.red,
           duration: const Duration(seconds: 5),
         ),
@@ -393,11 +556,149 @@ class _UserProgramImageGalleryScreenState
   Future<void> _notifyMediaScanner(String filePath) async {
     try {
       const platform = MethodChannel('com.example.jci_member_directory/media');
-      await platform.invokeMethod('scanFile', {'path': filePath});
-      await Future.delayed(const Duration(milliseconds: 500));
-      await platform.invokeMethod('refreshGallery');
+      try {
+        print('\n=== Starting Media Scanner Process ===');
+        print('File path to scan: $filePath');
+
+        // First try to scan the file with current timestamp
+        final file = File(filePath);
+        if (await file.exists()) {
+          // Set the last modified time to current time
+          await file.setLastModified(DateTime.now());
+          print('Updated file timestamp to current time');
+        }
+
+        // Scan the file with the media scanner
+        await platform.invokeMethod('scanFile', {
+          'path': filePath,
+          'mimeType': 'image/jpeg', // Explicitly set MIME type
+          'timestamp': DateTime.now().millisecondsSinceEpoch
+        });
+        print('File scanned successfully');
+
+        // Add a small delay to ensure media scanner completes
+        await Future.delayed(const Duration(seconds: 1));
+        print('=== Media Scanner Process Completed ===\n');
+      } catch (e) {
+        print('Error in media scanner: $e');
+        print('Error stack trace: ${StackTrace.current}');
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error scanning file: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } catch (e) {
-      print('Error notifying media scanner: $e');
+      print('Error in media scanner setup: $e');
+      print('Error stack trace: ${StackTrace.current}');
+    }
+  }
+
+  Future<void> _shareSelectedImages() async {
+    if (_selectedImages.isEmpty) return;
+
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Create temporary directory for sharing
+      final tempDir = await getTemporaryDirectory();
+      List<XFile> filesToShare = [];
+
+      // Show progress dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return StatefulBuilder(
+            builder: (context, setState) {
+              return AlertDialog(
+                title: Text(
+                  'Preparing Images',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Preparing ${_selectedImages.length} images for sharing...',
+                      style: GoogleFonts.poppins(),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      );
+
+      for (String imageId in _selectedImages) {
+        final image =
+            widget.folder.images.firstWhere((img) => img.id == imageId);
+        try {
+          final response = await http.get(Uri.parse(image.url));
+          if (response.statusCode == 200) {
+            final extension = image.url.split('.').last;
+            final fileName =
+                'JCI_${DateTime.now().millisecondsSinceEpoch}_$imageId.$extension';
+            final file = File('${tempDir.path}/$fileName');
+            await file.writeAsBytes(response.bodyBytes);
+            filesToShare.add(XFile(file.path));
+          }
+        } catch (e) {
+          print('Error preparing image $imageId for sharing: $e');
+        }
+      }
+
+      // Close the progress dialog
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      if (filesToShare.isNotEmpty) {
+        await Share.shareXFiles(
+          filesToShare,
+          text: 'Check out these images from JCI Kota Star!',
+          subject: 'JCI Kota Star Images',
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No images were prepared for sharing'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+
+      setState(() {
+        _selectedImages.clear();
+        _isSelectionMode = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // Close progress dialog if open
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error sharing images: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -451,6 +752,12 @@ class _UserProgramImageGalleryScreenState
                 });
               },
             ),
+            // Share button
+            IconButton(
+              icon: const Icon(Icons.share),
+              onPressed: _selectedImages.isEmpty ? null : _shareSelectedImages,
+            ),
+            // Download button
             IconButton(
               icon: const Icon(Icons.download),
               onPressed:
@@ -638,11 +945,43 @@ class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
   Future<void> _notifyMediaScanner(String filePath) async {
     try {
       const platform = MethodChannel('com.example.jci_member_directory/media');
-      await platform.invokeMethod('scanFile', {'path': filePath});
-      await Future.delayed(const Duration(milliseconds: 500));
-      await platform.invokeMethod('refreshGallery');
+      try {
+        print('\n=== Starting Media Scanner Process ===');
+        print('File path to scan: $filePath');
+
+        // First try to scan the file with current timestamp
+        final file = File(filePath);
+        if (await file.exists()) {
+          // Set the last modified time to current time
+          await file.setLastModified(DateTime.now());
+          print('Updated file timestamp to current time');
+        }
+
+        // Scan the file with the media scanner
+        await platform.invokeMethod('scanFile', {
+          'path': filePath,
+          'mimeType': 'image/jpeg', // Explicitly set MIME type
+          'timestamp': DateTime.now().millisecondsSinceEpoch
+        });
+        print('File scanned successfully');
+
+        // Add a small delay to ensure media scanner completes
+        await Future.delayed(const Duration(seconds: 1));
+        print('=== Media Scanner Process Completed ===\n');
+      } catch (e) {
+        print('Error in media scanner: $e');
+        print('Error stack trace: ${StackTrace.current}');
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error scanning file: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } catch (e) {
-      print('Error notifying media scanner: $e');
+      print('Error in media scanner setup: $e');
+      print('Error stack trace: ${StackTrace.current}');
     }
   }
 
@@ -663,15 +1002,61 @@ class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
         final fileName =
             'JCI_${DateTime.now().millisecondsSinceEpoch}.$extension';
         final file = File('${picturesDir.path}/$fileName');
+
+        // Write the file
         await file.writeAsBytes(bytes);
+
+        // Set both creation and modification time to current time
+        final now = DateTime.now();
+        await file.setLastModified(now);
+
+        // Use platform channel to set creation time
+        const platform =
+            MethodChannel('com.example.jci_member_directory/media');
+        await platform.invokeMethod('setFileCreationTime',
+            {'path': file.path, 'timestamp': now.millisecondsSinceEpoch});
 
         await _notifyMediaScanner(file.path);
 
         if (!mounted) return;
+
+        // Show success message with Open Gallery button
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Image downloaded successfully'),
+          SnackBar(
+            content: Row(
+              children: [
+                const Text('Image downloaded successfully'),
+                const Spacer(),
+                TextButton(
+                  onPressed: () async {
+                    try {
+                      const platform = MethodChannel(
+                          'com.example.jci_member_directory/media');
+                      await platform
+                          .invokeMethod('openGallery', {'path': file.path});
+                    } catch (e) {
+                      print('Error opening gallery: $e');
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error opening gallery: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text(
+                    'OPEN GALLERY',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
             backgroundColor: Colors.green,
+            duration: const Duration(seconds: 5),
           ),
         );
       } else {
@@ -689,15 +1074,61 @@ class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
           final fileName =
               'JCI_${DateTime.now().millisecondsSinceEpoch}.$extension';
           final file = File('${picturesDir.path}/$fileName');
+
+          // Write the file
           await file.writeAsBytes(response.bodyBytes);
+
+          // Set both creation and modification time to current time
+          final now = DateTime.now();
+          await file.setLastModified(now);
+
+          // Use platform channel to set creation time
+          const platform =
+              MethodChannel('com.example.jci_member_directory/media');
+          await platform.invokeMethod('setFileCreationTime',
+              {'path': file.path, 'timestamp': now.millisecondsSinceEpoch});
 
           await _notifyMediaScanner(file.path);
 
           if (!mounted) return;
+
+          // Show success message with Open Gallery button
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Image downloaded successfully'),
+            SnackBar(
+              content: Row(
+                children: [
+                  const Text('Image downloaded successfully'),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () async {
+                      try {
+                        const platform = MethodChannel(
+                            'com.example.jci_member_directory/media');
+                        await platform
+                            .invokeMethod('openGallery', {'path': file.path});
+                      } catch (e) {
+                        print('Error opening gallery: $e');
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error opening gallery: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+                    child: const Text(
+                      'OPEN GALLERY',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               backgroundColor: Colors.green,
+              duration: const Duration(seconds: 5),
             ),
           );
         }

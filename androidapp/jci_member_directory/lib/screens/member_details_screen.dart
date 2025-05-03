@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:android_intent_plus/flag.dart';
+import 'package:whatsapp_unilink/whatsapp_unilink.dart';
 
 class MemberDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> member;
@@ -40,50 +41,68 @@ class _MemberDetailsScreenState extends State<MemberDetailsScreen>
       return;
     }
 
-    // Remove any non-digit characters from the phone number
-    String cleanNumber = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
-    print('After removing non-digits: $cleanNumber');
-
-    // Remove leading '0' if present
-    if (cleanNumber.startsWith('0')) {
-      cleanNumber = cleanNumber.substring(1);
-      print('After removing leading 0: $cleanNumber');
-    }
-
-    // Add country code if not present
-    if (!cleanNumber.startsWith('+')) {
-      cleanNumber = '+91$cleanNumber'; // Adding India country code
-      print('After adding country code: $cleanNumber');
-    }
-
-    // Remove the '+' from the number for the URL
-    final numberForUrl = cleanNumber.replaceFirst('+', '');
-    print('Final number for URL: $numberForUrl');
-
+    String cleanNumber = '';
     try {
-      final Uri whatsappUrl = Uri.parse(
-          "https://wa.me/$numberForUrl?text=${Uri.encodeComponent('')}");
+      // Clean the phone number - only remove non-digits
+      cleanNumber = phoneNumber.replaceAll(RegExp(r'[^\d]'), '');
+      print('After removing non-digits: $cleanNumber');
 
-      print('Attempting to launch WhatsApp with URL: $whatsappUrl');
-
-      if (await canLaunchUrl(whatsappUrl)) {
-        await launchUrl(whatsappUrl);
-        print('Successfully launched WhatsApp');
-      } else {
-        print('Error: Could not launch WhatsApp');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                  'Could not launch WhatsApp. Please make sure WhatsApp is installed.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+      // Remove leading '0' if present
+      if (cleanNumber.startsWith('0')) {
+        cleanNumber = cleanNumber.substring(1);
+        print('After removing leading 0: $cleanNumber');
       }
+
+      // Try WhatsApp Business first
+      try {
+        final intent = AndroidIntent(
+          action: 'android.intent.action.VIEW',
+          data: 'whatsapp://send?phone=$cleanNumber',
+          package: 'com.whatsapp.w4b',
+          flags: [Flag.FLAG_ACTIVITY_NEW_TASK],
+        );
+
+        print('Attempting to launch WhatsApp Business');
+        await intent.launch();
+        print('Successfully launched WhatsApp Business');
+        return;
+      } catch (businessError) {
+        print('WhatsApp Business not available, trying regular WhatsApp');
+      }
+
+      // Try regular WhatsApp
+      try {
+        final intent = AndroidIntent(
+          action: 'android.intent.action.VIEW',
+          data: 'whatsapp://send?phone=$cleanNumber',
+          package: 'com.whatsapp',
+          flags: [Flag.FLAG_ACTIVITY_NEW_TASK],
+        );
+
+        print('Attempting to launch regular WhatsApp');
+        await intent.launch();
+        print('Successfully launched regular WhatsApp');
+        return;
+      } catch (regularError) {
+        print('Regular WhatsApp not available, trying web URL');
+      }
+
+      // Fallback to web URL if both apps fail
+      final Uri webUrl =
+          Uri.parse('https://api.whatsapp.com/send?phone=$cleanNumber');
+      print('Attempting to launch WhatsApp via web URL: $webUrl');
+
+      if (await canLaunchUrl(webUrl)) {
+        await launchUrl(webUrl, mode: LaunchMode.externalApplication);
+        print('Successfully launched WhatsApp via web URL');
+        return;
+      }
+
+      throw Exception('Could not launch WhatsApp through any method');
     } catch (e) {
       print('Error launching WhatsApp: $e');
       print('Error stack trace: ${StackTrace.current}');
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

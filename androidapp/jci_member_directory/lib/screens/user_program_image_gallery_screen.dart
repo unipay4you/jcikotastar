@@ -13,6 +13,7 @@ import '../services/auth_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 
 class UserProgramImageGalleryScreen extends StatefulWidget {
   final ProgramFolder folder;
@@ -401,73 +402,15 @@ class _UserProgramImageGalleryScreenState
   }
 
   void _showFullScreenImage(BuildContext context, String imageUrl) {
+    final initialIndex =
+        widget.folder.images.indexWhere((img) => img.url == imageUrl);
+
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => Scaffold(
-          appBar: AppBar(
-            title: Text(
-              'Image View',
-              style: GoogleFonts.poppins(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.download),
-                onPressed: () async {
-                  try {
-                    final bytes = ImageCacheManager.getImage(imageUrl);
-                    if (bytes != null) {
-                      final picturesDir =
-                          Directory('/storage/emulated/0/Pictures/JCIKotaStar');
-                      if (!await picturesDir.exists()) {
-                        await picturesDir.create(recursive: true);
-                      }
-
-                      final extension = imageUrl.split('.').last;
-                      final fileName =
-                          'JCI_${DateTime.now().millisecondsSinceEpoch}.$extension';
-                      final file = File('${picturesDir.path}/$fileName');
-                      await file.writeAsBytes(bytes);
-
-                      await _notifyMediaScanner(file.path);
-
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Image downloaded successfully'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error downloading image: $e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                },
-              ),
-            ],
-          ),
-          body: PhotoView(
-            imageProvider: ImageCacheManager.hasImage(imageUrl)
-                ? MemoryImage(ImageCacheManager.getImage(imageUrl)!)
-                    as ImageProvider
-                : CachedNetworkImageProvider(imageUrl),
-            minScale: PhotoViewComputedScale.contained,
-            maxScale: PhotoViewComputedScale.covered * 2,
-            backgroundDecoration: const BoxDecoration(
-              color: Colors.black,
-            ),
-            loadingBuilder: (context, event) => const Center(
-              child: CircularProgressIndicator(),
-            ),
-          ),
+        builder: (context) => FullScreenImageViewer(
+          images: widget.folder.images,
+          initialIndex: initialIndex,
         ),
       ),
     );
@@ -657,6 +600,274 @@ class _UserProgramImageGalleryScreenState
                     );
                   },
                 ),
+    );
+  }
+}
+
+class FullScreenImageViewer extends StatefulWidget {
+  final List<ProgramImage> images;
+  final int initialIndex;
+
+  const FullScreenImageViewer({
+    Key? key,
+    required this.images,
+    required this.initialIndex,
+  }) : super(key: key);
+
+  @override
+  State<FullScreenImageViewer> createState() => _FullScreenImageViewerState();
+}
+
+class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
+  late int currentIndex;
+  late PageController pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    currentIndex = widget.initialIndex;
+    pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    pageController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _notifyMediaScanner(String filePath) async {
+    try {
+      const platform = MethodChannel('com.example.jci_member_directory/media');
+      await platform.invokeMethod('scanFile', {'path': filePath});
+      await Future.delayed(const Duration(milliseconds: 500));
+      await platform.invokeMethod('refreshGallery');
+    } catch (e) {
+      print('Error notifying media scanner: $e');
+    }
+  }
+
+  Future<void> _downloadImage() async {
+    try {
+      final currentImage = widget.images[currentIndex];
+      final bytes = ImageCacheManager.getImage(currentImage.url);
+
+      if (bytes != null) {
+        // Create JCIKotaStar directory in Pictures folder
+        final picturesDir =
+            Directory('/storage/emulated/0/Pictures/JCIKotaStar');
+        if (!await picturesDir.exists()) {
+          await picturesDir.create(recursive: true);
+        }
+
+        final extension = currentImage.url.split('.').last;
+        final fileName =
+            'JCI_${DateTime.now().millisecondsSinceEpoch}.$extension';
+        final file = File('${picturesDir.path}/$fileName');
+        await file.writeAsBytes(bytes);
+
+        await _notifyMediaScanner(file.path);
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Image downloaded successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        // If image is not cached, download it first
+        final response = await http.get(Uri.parse(currentImage.url));
+        if (response.statusCode == 200) {
+          // Create JCIKotaStar directory in Pictures folder
+          final picturesDir =
+              Directory('/storage/emulated/0/Pictures/JCIKotaStar');
+          if (!await picturesDir.exists()) {
+            await picturesDir.create(recursive: true);
+          }
+
+          final extension = currentImage.url.split('.').last;
+          final fileName =
+              'JCI_${DateTime.now().millisecondsSinceEpoch}.$extension';
+          final file = File('${picturesDir.path}/$fileName');
+          await file.writeAsBytes(response.bodyBytes);
+
+          await _notifyMediaScanner(file.path);
+
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Image downloaded successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error downloading image: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        elevation: 0,
+        title: Text(
+          '${currentIndex + 1}/${widget.images.length}',
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.download, color: Colors.white),
+            onPressed: _downloadImage,
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          PageView.builder(
+            controller: pageController,
+            onPageChanged: (index) {
+              setState(() {
+                currentIndex = index;
+              });
+            },
+            itemCount: widget.images.length,
+            itemBuilder: (context, index) {
+              final currentImage = widget.images[index];
+              return PhotoView(
+                imageProvider: ImageCacheManager.hasImage(currentImage.url)
+                    ? MemoryImage(ImageCacheManager.getImage(currentImage.url)!)
+                        as ImageProvider
+                    : CachedNetworkImageProvider(currentImage.url),
+                minScale: PhotoViewComputedScale.contained,
+                maxScale: PhotoViewComputedScale.covered * 2,
+                backgroundDecoration: const BoxDecoration(
+                  color: Colors.black,
+                ),
+                loadingBuilder: (context, event) => const Center(
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            },
+          ),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.8),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  IconButton(
+                    icon:
+                        const Icon(Icons.share, color: Colors.white, size: 28),
+                    onPressed: () async {
+                      try {
+                        final currentImage = widget.images[currentIndex];
+                        final bytes =
+                            ImageCacheManager.getImage(currentImage.url);
+
+                        if (bytes != null) {
+                          // Create a temporary file to share
+                          final tempDir = await getTemporaryDirectory();
+                          final extension = currentImage.url.split('.').last;
+                          final fileName =
+                              'JCI_${DateTime.now().millisecondsSinceEpoch}.$extension';
+                          final file = File('${tempDir.path}/$fileName');
+                          await file.writeAsBytes(bytes);
+
+                          // Share the image
+                          await Share.shareXFiles(
+                            [XFile(file.path)],
+                            text: 'Check out this image from JCI Kota Star!',
+                            subject: 'JCI Kota Star Image',
+                          );
+                        } else {
+                          // If image is not cached, download it first
+                          final response =
+                              await http.get(Uri.parse(currentImage.url));
+                          if (response.statusCode == 200) {
+                            final tempDir = await getTemporaryDirectory();
+                            final extension = currentImage.url.split('.').last;
+                            final fileName =
+                                'JCI_${DateTime.now().millisecondsSinceEpoch}.$extension';
+                            final file = File('${tempDir.path}/$fileName');
+                            await file.writeAsBytes(response.bodyBytes);
+
+                            // Share the image
+                            await Share.shareXFiles(
+                              [XFile(file.path)],
+                              text: 'Check out this image from JCI Kota Star!',
+                              subject: 'JCI Kota Star Image',
+                            );
+                          }
+                        }
+                      } catch (e) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error sharing image: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.favorite_border,
+                        color: Colors.white, size: 28),
+                    onPressed: () {
+                      // TODO: Implement favorite functionality
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Favorite functionality coming soon'),
+                          backgroundColor: Colors.blue,
+                        ),
+                      );
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline,
+                        color: Colors.white, size: 28),
+                    onPressed: () {
+                      // TODO: Implement delete functionality
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Delete functionality coming soon'),
+                          backgroundColor: Colors.blue,
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

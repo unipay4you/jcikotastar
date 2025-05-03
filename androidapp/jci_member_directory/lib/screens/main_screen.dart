@@ -16,6 +16,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:jci_member_directory/screens/user_program_images_screen.dart';
+import 'package:jci_member_directory/screens/member_list_screen.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:android_intent_plus/android_intent.dart';
+import 'package:android_intent_plus/flag.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
@@ -32,6 +36,7 @@ class _MainScreenState extends State<MainScreen> {
   Map<String, dynamic>? _profileData;
   Map<String, dynamic>? _userData;
   int _currentCarouselIndex = 0;
+  List<dynamic> _members = [];
 
   // Sample carousel items (replace with your actual data)
   final List<Map<String, dynamic>> _carouselItems = [
@@ -96,6 +101,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _loadInitialData() async {
+    print('Loading initial data...');
     await _loadProfileData();
   }
 
@@ -123,6 +129,39 @@ class _MainScreenState extends State<MainScreen> {
           _userData = response['user'];
           _userType =
               response['profile']['user_type']?.toString().toUpperCase() ?? '';
+          // Extract members data from the response
+          _members = response['members'] ?? [];
+
+          // Print detailed members data
+          print('=== Members Data from Profile Response ===');
+          print('Total members: ${_members.length}');
+          for (var i = 0; i < _members.length; i++) {
+            final member = _members[i];
+            print('\nMember ${i + 1}:');
+            print('JC Name: ${member['jcName']}');
+            print('JC Position: ${member['jcpost'] ?? 'General Member'}');
+            print('JC Image: ${member['jcImage']}');
+            print('JC Mobile: ${member['jcMobile']?['phone_number']}');
+            print('JC Email: ${member['jcEmail']}');
+            print('JC Address: ${member['jcHomeAddress']}');
+            print('JC Occupation: ${member['jcOccupation']}');
+            print('JC Firm: ${member['jcFirmName']}');
+            print('JC Qualification: ${member['jcQualification']}');
+            print('JC Blood Group: ${member['jcBloodGroup']}');
+
+            if (member['jcrtName']?.isNotEmpty == true) {
+              print('\nJCRT Details:');
+              print('JCRT Name: ${member['jcrtName']}');
+              print('JCRT Position: ${member['jcrtpost'] ?? 'General Member'}');
+              print('JCRT Image: ${member['jcrtImage']}');
+              print('JCRT Mobile: ${member['jcrtMobile']?['phone_number']}');
+              print('JCRT Email: ${member['jcrtEmail']}');
+              print('JCRT Occupation: ${member['jcrtOccupation']}');
+              print('JCRT Blood Group: ${member['jcrtBloodGroup']}');
+            }
+            print('----------------------------------------');
+          }
+          print('=== End of Members Data ===');
         });
       } else {
         throw Exception('Failed to load profile data');
@@ -144,12 +183,6 @@ class _MainScreenState extends State<MainScreen> {
         });
       }
     }
-  }
-
-  Future<void> _refreshData() async {
-    print('Refreshing data...'); // Debug print
-    await _loadProfileData();
-    print('Refresh complete'); // Debug print
   }
 
   Future<void> _requestPermissions() async {
@@ -209,6 +242,151 @@ class _MainScreenState extends State<MainScreen> {
     if (mounted) {
       await _loadProfileData();
     }
+  }
+
+  Future<void> _launchWhatsApp(String? phoneNumber) async {
+    print('\n=== WhatsApp Launch Process Started ===');
+    print('Original phone number: $phoneNumber');
+
+    if (phoneNumber == null || phoneNumber.isEmpty) {
+      print('Error: Phone number is null or empty');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Phone number not available'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Remove any non-digit characters from the phone number
+    String cleanNumber = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
+    print('After removing non-digits: $cleanNumber');
+
+    // Remove leading '0' if present
+    if (cleanNumber.startsWith('0')) {
+      cleanNumber = cleanNumber.substring(1);
+      print('After removing leading 0: $cleanNumber');
+    }
+
+    // Add country code if not present
+    if (!cleanNumber.startsWith('+')) {
+      cleanNumber = '+91$cleanNumber'; // Adding India country code
+      print('After adding country code: $cleanNumber');
+    }
+
+    // Remove the '+' from the number for the URL
+    final numberForUrl = cleanNumber.replaceFirst('+', '');
+    print('Final number for URL: $numberForUrl');
+
+    try {
+      final Uri whatsappUrl = Uri.parse(
+          "https://wa.me/$numberForUrl?text=${Uri.encodeComponent('')}");
+
+      print('Attempting to launch WhatsApp with URL: $whatsappUrl');
+
+      if (await canLaunchUrl(whatsappUrl)) {
+        await launchUrl(whatsappUrl);
+        print('Successfully launched WhatsApp');
+      } else {
+        print('Error: Could not launch WhatsApp');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'Could not launch WhatsApp. Please make sure WhatsApp is installed.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error launching WhatsApp: $e');
+      print('Error stack trace: ${StackTrace.current}');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error launching WhatsApp: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+    print('=== WhatsApp Launch Process Ended ===\n');
+  }
+
+  Future<void> _launchPhoneCall(String? phoneNumber) async {
+    print('\n=== Phone Call Launch Process Started ===');
+    print('Original phone number: $phoneNumber');
+
+    if (phoneNumber == null || phoneNumber.isEmpty) {
+      print('Error: Phone number is null or empty');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Phone number not available'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Request phone call permission first
+    final status = await Permission.phone.request();
+    print('Phone permission status: $status');
+
+    if (status.isDenied) {
+      print('Phone permission denied');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Phone call permission is required to make calls'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      // Clean the phone number - only remove non-digits
+      String cleanNumber = phoneNumber.replaceAll(RegExp(r'[^\d]'), '');
+      print('After removing non-digits: $cleanNumber');
+
+      // Create Android Intent for phone call
+      final intent = AndroidIntent(
+        action: 'android.intent.action.CALL',
+        data: 'tel:$cleanNumber',
+        flags: [Flag.FLAG_ACTIVITY_NEW_TASK],
+      );
+
+      print('Attempting to launch phone call with number: $cleanNumber');
+      await intent.launch();
+      print('Successfully launched phone call intent');
+    } catch (e) {
+      print('Error launching phone call: $e');
+      print('Error stack trace: ${StackTrace.current}');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error launching phone call: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+    print('=== Phone Call Launch Process Ended ===\n');
+  }
+
+  Widget _buildWhatsAppIcon() {
+    return Image.asset(
+      'assets/media/logo/whatsup.png',
+      width: 24,
+      height: 24,
+    );
   }
 
   @override
@@ -403,6 +581,12 @@ class _MainScreenState extends State<MainScreen> {
               selected: true,
               onTap: () {
                 Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const MemberListScreen(),
+                  ),
+                );
               },
             ),
             ListTile(
@@ -673,42 +857,88 @@ class _MainScreenState extends State<MainScreen> {
               child: ListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: 10, // Replace with actual member count
+                itemCount: _members.length,
                 itemBuilder: (context, index) {
+                  final member = _members[index];
+                  print('Building member tile for: ${member['jcName']}');
                   return Card(
                     margin: const EdgeInsets.only(bottom: 15),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(15),
                     ),
                     child: ListTile(
-                      contentPadding: const EdgeInsets.all(15),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
                       leading: CircleAvatar(
-                        radius: 25,
+                        radius: 22,
                         backgroundColor: Colors.grey[200],
-                        child: const Icon(Icons.person),
+                        backgroundImage: member['jcImage'] != null
+                            ? NetworkImage(
+                                '${ApiConfig.baseUrl}${member['jcImage']}')
+                            : null,
+                        child: member['jcImage'] == null
+                            ? const Icon(Icons.person)
+                            : null,
                       ),
                       title: Text(
-                        'Member Name ${index + 1}',
+                        member['jcName'] ?? 'N/A',
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w600,
                           fontSize: 16,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       subtitle: Text(
-                        'Position ${index + 1}',
+                        member['jcpost'] ?? 'General Member',
                         style: GoogleFonts.poppins(
                           color: Colors.grey[600],
                           fontSize: 14,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.phone),
-                        onPressed: () {
-                          // Implement call functionality
-                        },
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (member['jcMobile']?['phone_number'] != null)
+                            IconButton(
+                              icon: _buildWhatsAppIcon(),
+                              onPressed: () => _launchWhatsApp(
+                                  member['jcMobile']?['phone_number']),
+                              tooltip: 'Open WhatsApp',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 32,
+                                minHeight: 32,
+                              ),
+                            ),
+                          IconButton(
+                            icon: const Icon(Icons.phone),
+                            onPressed: () {
+                              print(
+                                  'Phone button pressed for: ${member['jcName']}');
+                              _launchPhoneCall(
+                                  member['jcMobile']?['phone_number']);
+                            },
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 32,
+                              minHeight: 32,
+                            ),
+                          ),
+                        ],
                       ),
                       onTap: () {
-                        // Navigate to member details
+                        print('Member tile tapped: ${member['jcName']}');
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => MemberDetailsScreen(
+                              member: member,
+                            ),
+                          ),
+                        );
                       },
                     ),
                   );
@@ -719,6 +949,12 @@ class _MainScreenState extends State<MainScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _refreshData() async {
+    print('Refreshing data...'); // Debug print
+    await _loadProfileData();
+    print('Refresh complete'); // Debug print
   }
 }
 

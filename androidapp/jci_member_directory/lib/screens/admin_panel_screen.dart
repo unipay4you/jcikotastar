@@ -26,6 +26,7 @@ class _AdminMemberListScreenState extends State<AdminMemberListScreen> {
   List<dynamic> _filteredMembers = [];
   bool _showActiveOnly = true;
   bool _isLoading = false;
+  Map<String, dynamic>? _profile;
 
   @override
   void initState() {
@@ -57,6 +58,7 @@ class _AdminMemberListScreenState extends State<AdminMemberListScreen> {
       if (response['status'] == 200) {
         print('Successfully loaded members data');
         setState(() {
+          _profile = response['profile'];
           _members = response['members'] ?? [];
           // Apply initial filter for active members
           _filteredMembers = _members
@@ -282,12 +284,52 @@ class _AdminMemberListScreenState extends State<AdminMemberListScreen> {
                                       ),
                                       title: Padding(
                                         padding: const EdgeInsets.only(top: 4),
-                                        child: Text(
-                                          member['jcName'] ?? 'N/A',
-                                          style: GoogleFonts.poppins(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 18,
-                                          ),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: Row(
+                                                children: [
+                                                  Text(
+                                                    member['jcName'] ?? 'N/A',
+                                                    style: GoogleFonts.poppins(
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      fontSize: 18,
+                                                    ),
+                                                  ),
+                                                  if (member['jcMobile']
+                                                          ?['user_type'] ==
+                                                      'admin')
+                                                    Container(
+                                                      margin:
+                                                          const EdgeInsets.only(
+                                                              left: 8),
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                        horizontal: 8,
+                                                        vertical: 2,
+                                                      ),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.blue,
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(12),
+                                                      ),
+                                                      child: Text(
+                                                        'Admin',
+                                                        style:
+                                                            GoogleFonts.poppins(
+                                                          color: Colors.white,
+                                                          fontSize: 12,
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                       subtitle: Padding(
@@ -305,14 +347,206 @@ class _AdminMemberListScreenState extends State<AdminMemberListScreen> {
                                                 fontSize: 16,
                                               ),
                                             ),
-                                            Text(
-                                              member['jcMobile']
-                                                      ?['phone_number'] ??
-                                                  'No Phone',
-                                              style: GoogleFonts.poppins(
-                                                color: Colors.grey[600],
-                                                fontSize: 14,
-                                              ),
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              children: [
+                                                Text(
+                                                  member['jcMobile']
+                                                          ?['phone_number'] ??
+                                                      'No Phone',
+                                                  style: GoogleFonts.poppins(
+                                                    color: Colors.grey[600],
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
+                                                IconButton(
+                                                  icon: Icon(
+                                                    member['jcMobile']?[
+                                                                'user_type'] ==
+                                                            'admin'
+                                                        ? Icons
+                                                            .admin_panel_settings_outlined
+                                                        : Icons
+                                                            .admin_panel_settings,
+                                                    size: 20,
+                                                    color: member['jcMobile']?[
+                                                                'user_type'] ==
+                                                            'admin'
+                                                        ? Colors.red
+                                                        : Colors.blue,
+                                                  ),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints:
+                                                      const BoxConstraints(),
+                                                  onPressed: () async {
+                                                    final bool isAdmin = member[
+                                                                'jcMobile']
+                                                            ?['user_type'] ==
+                                                        'admin';
+
+                                                    // Show confirmation dialog
+                                                    final bool? confirm =
+                                                        await showDialog<bool>(
+                                                      context: context,
+                                                      builder: (BuildContext
+                                                          context) {
+                                                        return AlertDialog(
+                                                          title: Text(
+                                                            isAdmin
+                                                                ? 'Remove Admin'
+                                                                : 'Make Admin',
+                                                            style: GoogleFonts
+                                                                .poppins(
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w600),
+                                                          ),
+                                                          content: Text(
+                                                            isAdmin
+                                                                ? 'Are you sure you want to remove admin privileges from ${member['jcName']}?'
+                                                                : 'Are you sure you want to make ${member['jcName']} an admin?',
+                                                            style: GoogleFonts
+                                                                .poppins(),
+                                                          ),
+                                                          actions: [
+                                                            TextButton(
+                                                              onPressed: () =>
+                                                                  Navigator.of(
+                                                                          context)
+                                                                      .pop(
+                                                                          false),
+                                                              child: Text(
+                                                                'Cancel',
+                                                                style: GoogleFonts.poppins(
+                                                                    color: Colors
+                                                                            .grey[
+                                                                        600]),
+                                                              ),
+                                                            ),
+                                                            ElevatedButton(
+                                                              onPressed: () =>
+                                                                  Navigator.of(
+                                                                          context)
+                                                                      .pop(
+                                                                          true),
+                                                              style:
+                                                                  ElevatedButton
+                                                                      .styleFrom(
+                                                                backgroundColor:
+                                                                    isAdmin
+                                                                        ? Colors
+                                                                            .red
+                                                                        : Colors
+                                                                            .blue,
+                                                              ),
+                                                              child: Text(
+                                                                isAdmin
+                                                                    ? 'Remove Admin'
+                                                                    : 'Make Admin',
+                                                                style: GoogleFonts
+                                                                    .poppins(
+                                                                        color: Colors
+                                                                            .white),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        );
+                                                      },
+                                                    );
+
+                                                    if (confirm != true) return;
+
+                                                    try {
+                                                      print(
+                                                          '\n=== ${isAdmin ? "Removing" : "Making"} Member Admin ===');
+                                                      print(
+                                                          'Member ID: ${member['id']}');
+                                                      print(
+                                                          'Member Name: ${member['jcName']}');
+                                                      print(
+                                                          'Current Status: ${isAdmin ? "Admin" : "Not Admin"}');
+
+                                                      final token =
+                                                          await AuthService
+                                                              .getAccessToken();
+                                                      final response =
+                                                          await ApiService.post(
+                                                        endpoint:
+                                                            'api/admin/members/make-admin/',
+                                                        body: {
+                                                          'member_id':
+                                                              member['id'],
+                                                          'is_admin':
+                                                              !isAdmin, // Send the new desired state
+                                                        },
+                                                        token: token,
+                                                      );
+
+                                                      print('API Response:');
+                                                      print(
+                                                          'Status: ${response['status']}');
+                                                      print(
+                                                          'Message: ${response['message']}');
+
+                                                      if (response['status'] ==
+                                                          200) {
+                                                        print(
+                                                            'Admin status updated successfully');
+                                                        await _loadMembers(); // Reload the list
+                                                        if (!mounted) return;
+                                                        ScaffoldMessenger.of(
+                                                                context)
+                                                            .showSnackBar(
+                                                          SnackBar(
+                                                            content: Text(isAdmin
+                                                                ? 'Admin privileges removed from ${member['jcName']}'
+                                                                : '${member['jcName']} is now an admin'),
+                                                            backgroundColor:
+                                                                isAdmin
+                                                                    ? Colors
+                                                                        .orange
+                                                                    : Colors
+                                                                        .green,
+                                                          ),
+                                                        );
+                                                      } else {
+                                                        print(
+                                                            'Failed to update admin status');
+                                                        if (!mounted) return;
+                                                        ScaffoldMessenger.of(
+                                                                context)
+                                                            .showSnackBar(
+                                                          SnackBar(
+                                                            content: Text(response[
+                                                                    'message'] ??
+                                                                'Failed to update admin status'),
+                                                            backgroundColor:
+                                                                Colors.red,
+                                                          ),
+                                                        );
+                                                      }
+                                                    } catch (e) {
+                                                      print(
+                                                          'Error updating admin status: $e');
+                                                      if (!mounted) return;
+                                                      ScaffoldMessenger.of(
+                                                              context)
+                                                          .showSnackBar(
+                                                        SnackBar(
+                                                          content: Text(
+                                                              'Error: ${e.toString()}'),
+                                                          backgroundColor:
+                                                              Colors.red,
+                                                        ),
+                                                      );
+                                                    }
+                                                    print(
+                                                        '=== Admin Status Update Completed ===\n');
+                                                  },
+                                                ),
+                                              ],
                                             ),
                                           ],
                                         ),
@@ -341,6 +575,247 @@ class _AdminMemberListScreenState extends State<AdminMemberListScreen> {
                                         mainAxisAlignment:
                                             MainAxisAlignment.end,
                                         children: [
+                                          // Post Update Dropdown with Label
+                                          Row(
+                                            children: [
+                                              Text(
+                                                'New Post:',
+                                                style: GoogleFonts.poppins(
+                                                  fontSize: 12,
+                                                  color: Colors.grey[600],
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                width: 150,
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 8),
+                                                decoration: BoxDecoration(
+                                                  border: Border.all(
+                                                      color: Colors.grey[300]!),
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                ),
+                                                child: DropdownButton<String>(
+                                                  value: _getValidPostValue(
+                                                      member['jcpost']),
+                                                  underline: const SizedBox(),
+                                                  isDense: true,
+                                                  isExpanded: true,
+                                                  items: const [
+                                                    'General Member',
+                                                    'LGB Member',
+                                                    'President',
+                                                    'Vice President',
+                                                    'Secretary',
+                                                    'Treasurer',
+                                                    'Director',
+                                                    'Chairman',
+                                                    'Vice Chairman',
+                                                    'Executive Member',
+                                                  ].map((String value) {
+                                                    return DropdownMenuItem<
+                                                        String>(
+                                                      value: value,
+                                                      child: Text(
+                                                        value,
+                                                        style:
+                                                            GoogleFonts.poppins(
+                                                          fontSize: 14,
+                                                        ),
+                                                      ),
+                                                    );
+                                                  }).toList(),
+                                                  onChanged:
+                                                      (String? newValue) async {
+                                                    if (newValue != null) {
+                                                      // Show confirmation dialog
+                                                      final bool? confirm =
+                                                          await showDialog<
+                                                              bool>(
+                                                        context: context,
+                                                        builder: (BuildContext
+                                                            context) {
+                                                          return AlertDialog(
+                                                            title: Text(
+                                                              'Update Member Post',
+                                                              style: GoogleFonts.poppins(
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w600),
+                                                            ),
+                                                            content: Text(
+                                                              'Are you sure you want to change the post to "$newValue"?',
+                                                              style: GoogleFonts
+                                                                  .poppins(),
+                                                            ),
+                                                            actions: [
+                                                              TextButton(
+                                                                onPressed: () =>
+                                                                    Navigator.of(
+                                                                            context)
+                                                                        .pop(
+                                                                            false),
+                                                                child: Text(
+                                                                  'Cancel',
+                                                                  style: GoogleFonts
+                                                                      .poppins(
+                                                                          color:
+                                                                              Colors.grey[600]),
+                                                                ),
+                                                              ),
+                                                              ElevatedButton(
+                                                                onPressed: () =>
+                                                                    Navigator.of(
+                                                                            context)
+                                                                        .pop(
+                                                                            true),
+                                                                style: ElevatedButton
+                                                                    .styleFrom(
+                                                                  backgroundColor:
+                                                                      Colors
+                                                                          .blue,
+                                                                ),
+                                                                child: Text(
+                                                                  'Update',
+                                                                  style: GoogleFonts
+                                                                      .poppins(
+                                                                          color:
+                                                                              Colors.white),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          );
+                                                        },
+                                                      );
+
+                                                      if (confirm != true)
+                                                        return;
+
+                                                      try {
+                                                        print(
+                                                            '\n=== Updating Member Post ===');
+                                                        print(
+                                                            'Member ID: ${member['id']}');
+                                                        print(
+                                                            'Current Post: ${member['jcpost']}');
+                                                        print(
+                                                            'New Post: $newValue');
+
+                                                        final token =
+                                                            await AuthService
+                                                                .getAccessToken();
+                                                        final response =
+                                                            await ApiService
+                                                                .post(
+                                                          endpoint:
+                                                              'api/admin/members/update-post/',
+                                                          body: {
+                                                            'member_id':
+                                                                member['id'],
+                                                            'new_post':
+                                                                newValue,
+                                                          },
+                                                          token: token,
+                                                        );
+
+                                                        print('API Response:');
+                                                        print(
+                                                            'Status: ${response['status']}');
+                                                        print(
+                                                            'Message: ${response['message']}');
+
+                                                        if (response[
+                                                                'status'] ==
+                                                            200) {
+                                                          print(
+                                                              'Post updated successfully');
+                                                          await _loadMembers(); // Reload the list
+                                                          if (!mounted) return;
+                                                          ScaffoldMessenger.of(
+                                                                  context)
+                                                              .showSnackBar(
+                                                            SnackBar(
+                                                              content: Text(
+                                                                  'Post updated to $newValue'),
+                                                              backgroundColor:
+                                                                  Colors.green,
+                                                            ),
+                                                          );
+                                                        } else {
+                                                          print(
+                                                              'Failed to update post');
+                                                          if (!mounted) return;
+
+                                                          // Check for unauthorized message
+                                                          if (response[
+                                                                      'message']
+                                                                  ?.toString()
+                                                                  .contains(
+                                                                      'You are not authorized to access this page') ==
+                                                              true) {
+                                                            ScaffoldMessenger
+                                                                    .of(context)
+                                                                .showSnackBar(
+                                                              const SnackBar(
+                                                                content: Text(
+                                                                    'Session expired. Please login again.'),
+                                                                backgroundColor:
+                                                                    Colors.red,
+                                                              ),
+                                                            );
+                                                            // Navigate to main screen
+                                                            Navigator
+                                                                .pushAndRemoveUntil(
+                                                              context,
+                                                              MaterialPageRoute(
+                                                                builder:
+                                                                    (context) =>
+                                                                        const MainScreen(),
+                                                              ),
+                                                              (route) => false,
+                                                            );
+                                                            return;
+                                                          }
+
+                                                          ScaffoldMessenger.of(
+                                                                  context)
+                                                              .showSnackBar(
+                                                            SnackBar(
+                                                              content: Text(response[
+                                                                      'message'] ??
+                                                                  'Failed to update post'),
+                                                              backgroundColor:
+                                                                  Colors.red,
+                                                            ),
+                                                          );
+                                                        }
+                                                      } catch (e) {
+                                                        print(
+                                                            'Error updating post: $e');
+                                                        if (!mounted) return;
+                                                        ScaffoldMessenger.of(
+                                                                context)
+                                                            .showSnackBar(
+                                                          SnackBar(
+                                                            content: Text(
+                                                                'Error: ${e.toString()}'),
+                                                            backgroundColor:
+                                                                Colors.red,
+                                                          ),
+                                                        );
+                                                      }
+                                                      print(
+                                                          '=== Post Update Completed ===\n');
+                                                    }
+                                                  },
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(width: 8),
                                           IconButton(
                                             icon: const Icon(Icons.edit,
                                                 size: 20),
@@ -376,15 +851,6 @@ class _AdminMemberListScreenState extends State<AdminMemberListScreen> {
                                                 print(
                                                     '=== Edit Member Screen Result End ===\n');
                                               });
-                                            },
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(Icons.delete,
-                                                size: 20),
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(),
-                                            onPressed: () {
-                                              // TODO: Show delete confirmation dialog
                                             },
                                           ),
                                           const SizedBox(width: 8),
@@ -510,6 +976,28 @@ class _AdminMemberListScreenState extends State<AdminMemberListScreen> {
       );
     }
     print('=== Member Status Toggle Completed ===\n');
+  }
+
+  String _getValidPostValue(dynamic currentPost) {
+    const validPosts = [
+      'General Member',
+      'LGB Member',
+      'President',
+      'Vice President',
+      'Secretary',
+      'Treasurer',
+      'Director',
+      'Chairman',
+      'Vice Chairman',
+      'Executive Member',
+    ];
+
+    if (currentPost == null || currentPost.toString().isEmpty) {
+      return 'General Member';
+    }
+
+    final post = currentPost.toString();
+    return validPosts.contains(post) ? post : 'General Member';
   }
 }
 

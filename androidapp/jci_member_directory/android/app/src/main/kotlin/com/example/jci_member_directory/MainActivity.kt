@@ -20,6 +20,10 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.FileTime
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
+import android.content.ContentResolver
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import java.io.ByteArrayOutputStream
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.jci_member_directory/media"
@@ -29,128 +33,89 @@ class MainActivity : FlutterActivity() {
         
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
+                "saveImage" -> {
+                    val path = call.argument<String>("path")
+                    val bytes = call.argument<ByteArray>("bytes")
+                    if (path != null && bytes != null) {
+                        try {
+                            val contentValues = ContentValues().apply {
+                                put(MediaStore.Images.Media.DISPLAY_NAME, File(path).name)
+                                put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                    put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/JCIKotaStar")
+                                    put(MediaStore.Images.Media.IS_PENDING, 1)
+                                }
+                            }
+
+                            val contentResolver = context.contentResolver
+                            val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+                            
+                            if (uri != null) {
+                                contentResolver.openOutputStream(uri)?.use { outputStream ->
+                                    outputStream.write(bytes)
+                                }
+
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                    contentValues.clear()
+                                    contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
+                                    contentResolver.update(uri, contentValues, null, null)
+                                }
+
+                                // Notify media scanner
+                                MediaScannerConnection.scanFile(
+                                    context,
+                                    arrayOf(uri.toString()),
+                                    arrayOf("image/jpeg"),
+                                    null
+                                )
+
+                                result.success(uri.toString())
+                            } else {
+                                result.error("SAVE_ERROR", "Failed to create new MediaStore record", null)
+                            }
+                        } catch (e: Exception) {
+                            result.error("SAVE_ERROR", e.message, null)
+                        }
+                    } else {
+                        result.error("INVALID_ARGUMENTS", "Path or bytes is null", null)
+                    }
+                }
                 "scanFile" -> {
                     val path = call.argument<String>("path")
                     if (path != null) {
-                        val file = File(path)
-                        if (file.exists()) {
-                            // First update the file timestamps
-                            val currentTime = System.currentTimeMillis()
-                            file.setLastModified(currentTime)
-                            
-                            // Then update MediaStore
-                            val values = ContentValues().apply {
-                                put(MediaStore.Images.Media.DISPLAY_NAME, file.name)
-                                put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-                                put(MediaStore.Images.Media.DATA, file.absolutePath)
-                                put(MediaStore.Images.Media.DATE_ADDED, currentTime / 1000)
-                                put(MediaStore.Images.Media.DATE_MODIFIED, currentTime / 1000)
-                            }
-                            
-                            // Insert into MediaStore
-                            val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-                            
-                            // Force media scanner to scan the file
-                            MediaScannerConnection.scanFile(
-                                context,
-                                arrayOf(path),
-                                arrayOf("image/jpeg"),
-                                null
-                            )
-                            
-                            // Wait a bit to ensure scanning is complete
-                            Thread.sleep(1000)
-                            
-                            result.success(true)
-                        } else {
-                            result.error("FILE_NOT_FOUND", "File does not exist", null)
-                        }
-                    } else {
-                        result.error("INVALID_PATH", "Path is null", null)
-                    }
-                }
-                "setFileCreationTime" -> {
-                    val path = call.argument<String>("path")
-                    val timestamp = call.argument<Long>("timestamp")
-                    if (path != null && timestamp != null) {
                         try {
                             val file = File(path)
                             if (file.exists()) {
-                                // Set file system timestamps
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                    val fileTime = FileTime.fromMillis(timestamp)
-                                    Files.setAttribute(file.toPath(), "creationTime", fileTime)
-                                    Files.setAttribute(file.toPath(), "lastModifiedTime", fileTime)
-                                }
-                                
-                                // Update MediaStore entry
-                                val values = ContentValues().apply {
-                                    put(MediaStore.Images.Media.DATE_ADDED, timestamp / 1000)
-                                    put(MediaStore.Images.Media.DATE_MODIFIED, timestamp / 1000)
-                                }
-                                val uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-                                val selection = "${MediaStore.Images.Media.DATA} = ?"
-                                val selectionArgs = arrayOf(file.absolutePath)
-                                context.contentResolver.update(uri, values, selection, selectionArgs)
-                                
-                                // Force media scanner to scan the file again
                                 MediaScannerConnection.scanFile(
                                     context,
                                     arrayOf(path),
                                     arrayOf("image/jpeg"),
                                     null
                                 )
-                                
-                                // Wait a bit to ensure scanning is complete
-                                Thread.sleep(1000)
-                                
                                 result.success(true)
                             } else {
                                 result.error("FILE_NOT_FOUND", "File does not exist", null)
                             }
                         } catch (e: Exception) {
-                            result.error("ERROR", e.message, null)
+                            result.error("SCAN_ERROR", e.message, null)
                         }
                     } else {
-                        result.error("INVALID_ARGUMENTS", "Path or timestamp is null", null)
+                        result.error("INVALID_PATH", "Path is null", null)
                     }
                 }
                 "openGallery" -> {
                     val path = call.argument<String>("path")
                     if (path != null) {
-                        val file = File(path)
-                        if (file.exists()) {
-                            // First ensure the file is properly scanned
-                            MediaScannerConnection.scanFile(
-                                context,
-                                arrayOf(path),
-                                arrayOf("image/jpeg"),
-                                null
-                            )
-                            
-                            // Wait a bit to ensure scanning is complete
-                            Thread.sleep(1000)
-                            
-                            // Try to open Google Photos first
-                            try {
-                                val intent = Intent(Intent.ACTION_VIEW).apply {
-                                    setDataAndType(Uri.fromFile(file), "image/*")
-                                    setPackage("com.google.android.apps.photos")
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                }
-                                context.startActivity(intent)
-                                result.success(true)
-                            } catch (e: Exception) {
-                                // If Google Photos fails, try system gallery
-                                val intent = Intent(Intent.ACTION_VIEW).apply {
-                                    setDataAndType(Uri.fromFile(file), "image/*")
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                }
-                                context.startActivity(intent)
-                                result.success(true)
+                        try {
+                            val uri = Uri.parse(path)
+                            val intent = Intent(Intent.ACTION_VIEW).apply {
+                                setDataAndType(uri, "image/*")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
-                        } else {
-                            result.error("FILE_NOT_FOUND", "File does not exist", null)
+                            context.startActivity(intent)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("GALLERY_ERROR", e.message, null)
                         }
                     } else {
                         result.error("INVALID_PATH", "Path is null", null)

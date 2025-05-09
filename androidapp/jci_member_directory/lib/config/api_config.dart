@@ -3,7 +3,7 @@ class ApiConfig {
   // Use 10.0.2.2 for Android emulator to access host machine's localhost
   // Use actual IP address for real devices
   static const String baseUrl =
-      'http://192.168.1.6:8000/'; // Replace with your computer's IP address
+      'http://192.168.1.2:8000/'; // Replace with your computer's IP address
 
   // API Endpoints
   static const String login = 'api/auth/login/';
@@ -18,8 +18,8 @@ class ApiConfig {
   static const String members = 'api/members/';
   static const String memberDetails = 'api/members/';
   static const String adminDashboard = 'api/admin/dashboard/';
-  static const String programImages = '/api/program-images/';
-  static const String uploadProgramImage = '/api/program-images/upload/';
+  static const String programImages = 'api/program-images/';
+  static const String uploadProgramImage = 'api/program-images/upload/';
 
   // API Headers
   static Map<String, String> getHeaders({String? token}) {

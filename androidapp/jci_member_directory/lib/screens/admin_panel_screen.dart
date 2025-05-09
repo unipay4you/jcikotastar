@@ -9,13 +9,11 @@ import 'program_images_screen.dart';
 import 'dart:convert';
 import '../services/auth_service.dart';
 import 'member_list_screen.dart';
+import 'admin/edit_member_screen.dart';
 
 class AdminMemberListScreen extends StatefulWidget {
-  final List<dynamic> members;
-
   const AdminMemberListScreen({
     Key? key,
-    required this.members,
   }) : super(key: key);
 
   @override
@@ -24,220 +22,185 @@ class AdminMemberListScreen extends StatefulWidget {
 
 class _AdminMemberListScreenState extends State<AdminMemberListScreen> {
   final _searchController = TextEditingController();
+  List<dynamic> _members = [];
   List<dynamic> _filteredMembers = [];
+  bool _showActiveOnly = true;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _filteredMembers = widget.members;
+    _loadMembers();
+  }
+
+  Future<void> _loadMembers() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      print('\n=== Loading Members List ===');
+      final token = await AuthService.getAccessToken();
+      print(
+          'Auth Token retrieved: ${token != null ? 'Token exists' : 'No token'}');
+
+      final response = await ApiService.get(
+        endpoint: 'api/admin/members/list/',
+        token: token,
+      );
+
+      print('API Response:');
+      print('Status: ${response['status']}');
+      print('Has members: ${response['members'] != null}');
+      print('Response structure: ${json.encode(response)}');
+
+      if (response['status'] == 200) {
+        print('Successfully loaded members data');
+        setState(() {
+          _members = response['members'] ?? [];
+          // Apply initial filter for active members
+          _filteredMembers = _members
+              .where((member) => !(member['is_deleted'] ?? false))
+              .toList();
+          print('Total members: ${_members.length}');
+          print('Active members: ${_filteredMembers.length}');
+        });
+      } else {
+        print('Failed to load members data');
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response['message'] ?? 'Failed to load members'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error loading members: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading members: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      print('=== Members List Loading Completed ===\n');
+    }
+  }
+
+  void _toggleFilter() {
+    setState(() {
+      _showActiveOnly = !_showActiveOnly;
+      if (_showActiveOnly) {
+        _filteredMembers =
+            _members.where((member) => member['is_active'] == true).toList();
+      } else {
+        _filteredMembers = _members;
+      }
+      // Reapply search filter if there's any search text
+      if (_searchController.text.isNotEmpty) {
+        _filterMembers(_searchController.text);
+      }
+    });
   }
 
   void _filterMembers(String query) {
     setState(() {
-      _filteredMembers = widget.members.where((member) {
+      final baseList = _showActiveOnly
+          ? _members.where((member) => member['is_active'] == true).toList()
+          : _members;
+
+      _filteredMembers = baseList.where((member) {
+        final searchQuery = query.toLowerCase();
+
+        // Search in all relevant fields
         final name = member['jcName']?.toString().toLowerCase() ?? '';
         final position = member['jcpost']?.toString().toLowerCase() ?? '';
-        final searchQuery = query.toLowerCase();
-        return name.contains(searchQuery) || position.contains(searchQuery);
+        final email = member['jcEmail']?.toString().toLowerCase() ?? '';
+        final phone =
+            member['jcMobile']?['phone_number']?.toString().toLowerCase() ?? '';
+        final bloodGroup =
+            member['jcBloodGroup']?.toString().toLowerCase() ?? '';
+        final qualification =
+            member['jcQualification']?.toString().toLowerCase() ?? '';
+        final occupation =
+            member['jcOccupation']?.toString().toLowerCase() ?? '';
+        final firmName = member['jcFirmName']?.toString().toLowerCase() ?? '';
+        final address = member['jcHomeAddress']?.toString().toLowerCase() ?? '';
+
+        // Search in JCRT fields if available
+        final jcrtName = member['jcrtName']?.toString().toLowerCase() ?? '';
+        final jcrtPosition = member['jcrtpost']?.toString().toLowerCase() ?? '';
+        final jcrtEmail = member['jcrtEmail']?.toString().toLowerCase() ?? '';
+        final jcrtPhone =
+            member['jcrtMobile']?['phone_number']?.toString().toLowerCase() ??
+                '';
+
+        return name.contains(searchQuery) ||
+            position.contains(searchQuery) ||
+            email.contains(searchQuery) ||
+            phone.contains(searchQuery) ||
+            bloodGroup.contains(searchQuery) ||
+            qualification.contains(searchQuery) ||
+            occupation.contains(searchQuery) ||
+            firmName.contains(searchQuery) ||
+            address.contains(searchQuery) ||
+            jcrtName.contains(searchQuery) ||
+            jcrtPosition.contains(searchQuery) ||
+            jcrtEmail.contains(searchQuery) ||
+            jcrtPhone.contains(searchQuery);
       }).toList();
     });
   }
 
-  void _showMemberDetails(dynamic member) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header with image and name
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    CircleAvatar(
-                      radius: 40,
-                      backgroundColor: Colors.grey[200],
-                      backgroundImage: member['jcImage'] != null
-                          ? NetworkImage(
-                              '${ApiConfig.baseUrl}${member['jcImage']}')
-                          : null,
-                      child: member['jcImage'] == null
-                          ? const Icon(Icons.person, size: 40)
-                          : null,
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            member['jcName'] ?? 'N/A',
-                            style: GoogleFonts.poppins(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            member['jcpost'] ?? 'General Member',
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // JC Details Section
-                Text(
-                  'JC Details',
-                  style: GoogleFonts.poppins(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _buildDetailRow('Email', member['jcEmail'] ?? 'N/A'),
-                _buildDetailRow(
-                    'Phone', member['jcMobile']?['phone_number'] ?? 'N/A'),
-                _buildDetailRow('Blood Group', member['jcBloodGroup'] ?? 'N/A'),
-                _buildDetailRow(
-                    'Qualification', member['jcQualification'] ?? 'N/A'),
-                _buildDetailRow('Occupation', member['jcOccupation'] ?? 'N/A'),
-                _buildDetailRow('Firm Name', member['jcFirmName'] ?? 'N/A'),
-                _buildDetailRow('Address', member['jcHomeAddress'] ?? 'N/A'),
-                _buildDetailRow('Occupation Address',
-                    member['jcOccupationAddress'] ?? 'N/A'),
-                _buildDetailRow('Date of Birth', member['jcDob'] ?? 'N/A'),
-
-                if (member['jcrtName']?.isNotEmpty == true) ...[
-                  const SizedBox(height: 24),
-                  // JCRT Details Section
-                  Text(
-                    'JCRT Details',
-                    style: GoogleFonts.poppins(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.pink,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDetailRow('Name', member['jcrtName'] ?? 'N/A'),
-                  _buildDetailRow('Email', member['jcrtEmail'] ?? 'N/A'),
-                  _buildDetailRow(
-                      'Phone', member['jcrtMobile']?['phone_number'] ?? 'N/A'),
-                  _buildDetailRow(
-                      'Blood Group', member['jcrtBloodGroup'] ?? 'N/A'),
-                  _buildDetailRow(
-                      'Occupation', member['jcrtOccupation'] ?? 'N/A'),
-                  _buildDetailRow('Occupation Address',
-                      member['jcrtOccupationAddress'] ?? 'N/A'),
-                  _buildDetailRow('Date of Birth', member['jcrtDob'] ?? 'N/A'),
-                  _buildDetailRow('Position', member['jcrtpost'] ?? 'N/A'),
-                ],
-
-                const SizedBox(height: 24),
-                // Anniversary Date
-                _buildDetailRow(
-                    'Anniversary Date', member['anniversaryDate'] ?? 'N/A'),
-
-                const SizedBox(height: 24),
-                // Action Buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text(
-                        'Close',
-                        style: GoogleFonts.poppins(
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: () {
-                        // TODO: Navigate to edit member screen
-                        Navigator.pop(context);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: Text(
-                        'Edit',
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Colors.grey[700],
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: Colors.black87,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    // Calculate counts
+    final totalMembers = _members.length;
+    final activeMembers =
+        _members.where((member) => member['is_active'] == true).length;
+    final displayedMembers = _filteredMembers.length;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'Member List',
-          style: GoogleFonts.poppins(
-            fontWeight: FontWeight.w600,
-          ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Member List',
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Text(
+              _showActiveOnly
+                  ? '$activeMembers Active Members'
+                  : '$totalMembers Total Members',
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                color: _showActiveOnly ? Colors.green : Colors.blue,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
         actions: [
+          IconButton(
+            icon: Icon(
+              _showActiveOnly ? Icons.filter_list : Icons.filter_list_off,
+              color: _showActiveOnly ? Colors.blue : Colors.grey,
+            ),
+            onPressed: _toggleFilter,
+            tooltip: _showActiveOnly
+                ? 'Show All Members'
+                : 'Show Active Members Only',
+          ),
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () {
@@ -251,116 +214,302 @@ class _AdminMemberListScreenState extends State<AdminMemberListScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Search Bar
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search members...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: Colors.grey[200],
-              ),
-              onChanged: _filterMembers,
-            ),
-          ),
-          // Member List
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _filteredMembers.length,
-              itemBuilder: (context, index) {
-                final member = _filteredMembers[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _loadMembers,
+              child: Column(
+                children: [
+                  // Search Bar
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search members...',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none,
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[200],
+                      ),
+                      onChanged: _filterMembers,
+                    ),
                   ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    leading: CircleAvatar(
-                      radius: 24,
-                      backgroundColor: Colors.grey[200],
-                      backgroundImage: member['jcImage'] != null
-                          ? NetworkImage(
-                              '${ApiConfig.baseUrl}${member['jcImage']}')
-                          : null,
-                      child: member['jcImage'] == null
-                          ? const Icon(Icons.person)
-                          : null,
-                    ),
-                    title: Text(
-                      member['jcName'] ?? 'N/A',
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
+                  // Member List
+                  Expanded(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      child: ListView.builder(
+                        key: ValueKey<bool>(_showActiveOnly),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: _filteredMembers.length,
+                        itemBuilder: (context, index) {
+                          final member = _filteredMembers[index];
+                          return AnimatedSlide(
+                            duration: const Duration(milliseconds: 300),
+                            offset: Offset.zero,
+                            child: AnimatedOpacity(
+                              duration: const Duration(milliseconds: 300),
+                              opacity: 1.0,
+                              child: Card(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Column(
+                                  children: [
+                                    ListTile(
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 12,
+                                      ),
+                                      minVerticalPadding: 12,
+                                      leading: CircleAvatar(
+                                        radius: 30,
+                                        backgroundColor: Colors.grey[200],
+                                        backgroundImage: member['jcImage'] !=
+                                                null
+                                            ? NetworkImage(
+                                                '${ApiConfig.baseUrl}${member['jcImage']}')
+                                            : null,
+                                        child: member['jcImage'] == null
+                                            ? const Icon(Icons.person, size: 30)
+                                            : null,
+                                      ),
+                                      title: Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Text(
+                                          member['jcName'] ?? 'N/A',
+                                          style: GoogleFonts.poppins(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 18,
+                                          ),
+                                        ),
+                                      ),
+                                      subtitle: Padding(
+                                        padding: const EdgeInsets.only(
+                                            top: 4, bottom: 4),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              member['jcpost'] ??
+                                                  'General Member',
+                                              style: GoogleFonts.poppins(
+                                                color: Colors.grey[600],
+                                                fontSize: 16,
+                                              ),
+                                            ),
+                                            Text(
+                                              member['jcMobile']
+                                                      ?['phone_number'] ??
+                                                  'No Phone',
+                                              style: GoogleFonts.poppins(
+                                                color: Colors.grey[600],
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                AdminMemberDetailsScreen(
+                                              member: member,
+                                            ),
+                                          ),
+                                        ).then((result) {
+                                          if (result == true) {
+                                            _loadMembers(); // Reload members when returning from details
+                                          }
+                                        });
+                                      },
+                                    ),
+                                    const Divider(height: 1),
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                          right: 16, bottom: 8, top: 4),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.end,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(Icons.edit,
+                                                size: 20),
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(),
+                                            onPressed: () {
+                                              print(
+                                                  '\n=== Navigating to Edit Member Screen ===');
+                                              print(
+                                                  'Member ID: ${member['id']}');
+                                              print(
+                                                  'Member Name: ${member['jcName']}');
+                                              print(
+                                                  'Member Data: ${json.encode(member)}');
+
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (context) =>
+                                                      EditMemberScreen(
+                                                    member: member,
+                                                  ),
+                                                ),
+                                              ).then((result) {
+                                                print(
+                                                    '\n=== Edit Member Screen Result ===');
+                                                print('Result: $result');
+                                                if (result == true) {
+                                                  print(
+                                                      'Reloading members list...');
+                                                  _loadMembers(); // Reload members after successful edit
+                                                }
+                                                print(
+                                                    '=== Edit Member Screen Result End ===\n');
+                                              });
+                                            },
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(Icons.delete,
+                                                size: 20),
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(),
+                                            onPressed: () {
+                                              // TODO: Show delete confirmation dialog
+                                            },
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Switch(
+                                            value: member['is_active'] == true,
+                                            onChanged: (value) {
+                                              _toggleMemberStatus(
+                                                  member, value);
+                                            },
+                                            activeColor: Colors.green,
+                                            materialTapTargetSize:
+                                                MaterialTapTargetSize
+                                                    .shrinkWrap,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          member['jcpost'] ?? 'General Member',
-                          style: GoogleFonts.poppins(
-                            color: Colors.grey[600],
-                            fontSize: 14,
-                          ),
-                        ),
-                        if (member['jcEmail']?.isNotEmpty == true)
-                          Text(
-                            member['jcEmail'],
-                            style: GoogleFonts.poppins(
-                              color: Colors.grey[600],
-                              fontSize: 12,
-                            ),
-                          ),
-                      ],
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit),
-                          onPressed: () {
-                            // TODO: Navigate to edit member screen
-                          },
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete),
-                          onPressed: () {
-                            // TODO: Show delete confirmation dialog
-                          },
-                        ),
-                      ],
-                    ),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => AdminMemberDetailsScreen(
-                            member: member,
-                          ),
-                        ),
-                      );
-                    },
                   ),
-                );
-              },
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
     );
+  }
+
+  Future<void> _toggleMemberStatus(dynamic member, bool newStatus) async {
+    // Show confirmation dialog
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(
+            newStatus ? 'Activate Member' : 'Deactivate Member',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+          ),
+          content: Text(
+            newStatus
+                ? 'Are you sure you want to activate this member?'
+                : 'Are you sure you want to deactivate this member?',
+            style: GoogleFonts.poppins(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.poppins(color: Colors.grey[600]),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: newStatus ? Colors.green : Colors.red,
+              ),
+              child: Text(
+                newStatus ? 'Activate' : 'Deactivate',
+                style: GoogleFonts.poppins(color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) return;
+
+    try {
+      print('\n=== Toggling Member Status ===');
+      print('Member ID: ${member['id']}');
+      print('Current Status: ${member['is_active']}');
+      print('New Status: ${newStatus ? 'Active' : 'Inactive'}');
+
+      final token = await AuthService.getAccessToken();
+      final response = await ApiService.post(
+        endpoint: 'api/admin/members/change-status/',
+        body: {
+          'member_id': member['id'],
+        },
+        token: token,
+      );
+
+      print('API Response:');
+      print('Status: ${response['status']}');
+      print('Message: ${response['message']}');
+
+      if (response['status'] == 200) {
+        print('Status updated successfully');
+        await _loadMembers(); // Reload the entire list
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newStatus
+                ? 'Member activated successfully'
+                : 'Member deactivated successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        print('Failed to update status');
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response['message'] ?? 'Failed to update status'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error updating member status: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+    print('=== Member Status Toggle Completed ===\n');
   }
 }
 
@@ -624,9 +773,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => AdminMemberListScreen(
-                    members: _adminData?['members'] ?? [],
-                  ),
+                  builder: (context) => AdminMemberListScreen(),
                 ),
               );
             }
@@ -809,8 +956,29 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen>
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
-            onPressed: () {
-              // TODO: Navigate to edit member screen
+            onPressed: () async {
+              print('\n=== Navigating to Edit Member Screen from Details ===');
+              print('Member ID: ${widget.member['id']}');
+              print('Member Name: ${widget.member['jcName']}');
+              print('Member Data: ${json.encode(widget.member)}');
+
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => EditMemberScreen(
+                    member: widget.member,
+                  ),
+                ),
+              );
+
+              print('\n=== Edit Member Screen Result from Details ===');
+              print('Result: $result');
+              if (result == true) {
+                print('Returning to member list with refresh flag');
+                // Return true to refresh the member list
+                Navigator.pop(context, true);
+              }
+              print('=== Edit Member Screen Result from Details End ===\n');
             },
           ),
         ],
@@ -859,26 +1027,38 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen>
                   ),
                 ),
                 const SizedBox(height: 32),
-                // JC Details
+
+                // Personal Information Section
+                _buildSectionHeader('Personal Information'),
+                _buildDetailRow(
+                    'Post', widget.member['jcpost'] ?? 'General Member'),
                 _buildDetailRow('Email', widget.member['jcEmail'] ?? 'N/A'),
                 _buildDetailRow('Phone',
                     widget.member['jcMobile']?['phone_number'] ?? 'N/A'),
                 _buildDetailRow(
                     'Blood Group', widget.member['jcBloodGroup'] ?? 'N/A'),
                 _buildDetailRow(
+                    'Date of Birth', widget.member['jcDob'] ?? 'N/A'),
+                _buildDetailRow('Anniversary Date',
+                    widget.member['anniversaryDate'] ?? 'N/A'),
+
+                const SizedBox(height: 24),
+                // Professional Information Section
+                _buildSectionHeader('Professional Information'),
+                _buildDetailRow(
                     'Qualification', widget.member['jcQualification'] ?? 'N/A'),
                 _buildDetailRow(
                     'Occupation', widget.member['jcOccupation'] ?? 'N/A'),
                 _buildDetailRow(
                     'Firm Name', widget.member['jcFirmName'] ?? 'N/A'),
-                _buildDetailRow(
-                    'Address', widget.member['jcHomeAddress'] ?? 'N/A'),
                 _buildDetailRow('Occupation Address',
                     widget.member['jcOccupationAddress'] ?? 'N/A'),
+
+                const SizedBox(height: 24),
+                // Address Information Section
+                _buildSectionHeader('Address Information'),
                 _buildDetailRow(
-                    'Date of Birth', widget.member['jcDob'] ?? 'N/A'),
-                _buildDetailRow('Anniversary Date',
-                    widget.member['anniversaryDate'] ?? 'N/A'),
+                    'Home Address', widget.member['jcHomeAddress'] ?? 'N/A'),
               ],
             ),
           ),
@@ -925,7 +1105,12 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen>
                         ),
                       ),
                       const SizedBox(height: 32),
-                      // JCRT Details
+
+                      // Personal Information Section
+                      _buildSectionHeader('Personal Information',
+                          color: Colors.pink),
+                      _buildDetailRow('Post',
+                          widget.member['jcrtpost'] ?? 'General Member'),
                       _buildDetailRow(
                           'Email', widget.member['jcrtEmail'] ?? 'N/A'),
                       _buildDetailRow(
@@ -934,12 +1119,17 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen>
                               'N/A'),
                       _buildDetailRow('Blood Group',
                           widget.member['jcrtBloodGroup'] ?? 'N/A'),
+                      _buildDetailRow(
+                          'Date of Birth', widget.member['jcrtDob'] ?? 'N/A'),
+
+                      const SizedBox(height: 24),
+                      // Professional Information Section
+                      _buildSectionHeader('Professional Information',
+                          color: Colors.pink),
                       _buildDetailRow('Occupation',
                           widget.member['jcrtOccupation'] ?? 'N/A'),
                       _buildDetailRow('Occupation Address',
                           widget.member['jcrtOccupationAddress'] ?? 'N/A'),
-                      _buildDetailRow(
-                          'Date of Birth', widget.member['jcrtDob'] ?? 'N/A'),
                     ],
                   )
                 : Center(
@@ -965,6 +1155,23 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, {Color color = Colors.blue}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: GoogleFonts.poppins(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        const SizedBox(height: 12),
+      ],
     );
   }
 }

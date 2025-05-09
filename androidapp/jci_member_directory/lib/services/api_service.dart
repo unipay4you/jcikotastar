@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 
 class ApiService {
   static const _timeoutDuration = Duration(seconds: 30);
+  final _baseUrl = ApiConfig.baseUrl;
 
   static Future<Map<String, dynamic>> post({
     required String endpoint,
@@ -224,6 +225,21 @@ class ApiService {
         'status': 500,
         'message': 'Error uploading image: ${e.toString()}',
       };
+    }
+  }
+
+  Future<void> addMember(Map<String, dynamic> memberData, String token) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/members'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(memberData),
+    );
+
+    if (response.statusCode != 201) {
+      throw Exception('Failed to add member: ${response.body}');
     }
   }
 }

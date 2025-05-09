@@ -10,6 +10,8 @@ class AuthService {
   static const _userTypeKey = 'usertype';
   static const _isFirstLoginKey = 'isFirstLogin';
 
+  final _prefs = SharedPreferences.getInstance();
+
   // Check if user is logged in and validate token
   static Future<bool> isLoggedIn() async {
     try {
@@ -73,5 +75,10 @@ class AuthService {
     await _storage.deleteAll();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_isFirstLoginKey);
+  }
+
+  Future<String?> getToken() async {
+    final prefs = await _prefs;
+    return prefs.getString('token');
   }
 }

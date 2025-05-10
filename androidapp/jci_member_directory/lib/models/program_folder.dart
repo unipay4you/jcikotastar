@@ -1,11 +1,13 @@
 class ProgramFolder {
   final String id;
   final String name;
+  final String? programImage;
   List<ProgramImage> images;
 
   ProgramFolder({
     required this.id,
     required this.name,
+    this.programImage,
     this.images = const [],
   });
 
@@ -13,6 +15,7 @@ class ProgramFolder {
     return ProgramFolder(
       id: json['id'],
       name: json['name'],
+      programImage: json['programImage'],
       images: (json['images'] as List?)
               ?.map((image) => ProgramImage.fromJson(image))
               .toList() ??
@@ -24,6 +27,7 @@ class ProgramFolder {
     return {
       'id': id,
       'name': name,
+      'programImage': programImage,
       'images': images.map((image) => image.toJson()).toList(),
     };
   }

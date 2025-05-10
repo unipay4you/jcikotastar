@@ -8,6 +8,7 @@ import '../config/api_config.dart';
 import '../models/program_folder.dart';
 import '../services/auth_service.dart';
 import 'program_image_gallery_screen.dart';
+import 'dart:convert';
 
 class ProgramImagesScreen extends StatefulWidget {
   const ProgramImagesScreen({Key? key}) : super(key: key);
@@ -19,10 +20,11 @@ class ProgramImagesScreen extends StatefulWidget {
 class _ProgramImagesScreenState extends State<ProgramImagesScreen> {
   bool _isLoading = false;
   List<ProgramFolder> _folders = [];
-  ProgramFolder? _selectedFolder;
-  final ImagePicker _picker = ImagePicker();
   int _selectedYear = DateTime.now().year;
   late List<int> _years;
+  final _formKey = GlobalKey<FormState>();
+  final _programNameController = TextEditingController();
+  final _programDescriptionController = TextEditingController();
 
   @override
   void initState() {
@@ -34,12 +36,170 @@ class _ProgramImagesScreenState extends State<ProgramImagesScreen> {
     _loadFolders();
   }
 
+  @override
+  void dispose() {
+    _programNameController.dispose();
+    _programDescriptionController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _showNewFolderDialog() async {
+    return showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(
+            'Create New Program Folder',
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          content: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: _programNameController,
+                    decoration: InputDecoration(
+                      labelText: 'Program Name',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter program name';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _programDescriptionController,
+                    decoration: InputDecoration(
+                      labelText: 'Program Description',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    maxLines: 3,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter program description';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.poppins(
+                  color: Colors.grey[600],
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (_formKey.currentState!.validate()) {
+                  Navigator.of(context).pop();
+                  await _createNewFolder();
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).primaryColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Text(
+                'Create',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _createNewFolder() async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      final token = await AuthService.getAccessToken();
+      final response = await ApiService.post(
+        endpoint: 'api/admin/programs/create/',
+        body: {
+          'programName': _programNameController.text,
+          'programDescription': _programDescriptionController.text,
+          'year': _selectedYear,
+        },
+        token: token,
+      );
+
+      if (response['status'] == 200) {
+        // Clear the form
+        _programNameController.clear();
+        _programDescriptionController.clear();
+
+        // Reload folders
+        await _loadFolders();
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Program folder created successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text(response['message'] ?? 'Failed to create program folder'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error creating program folder: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   Future<void> _loadFolders() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
+      print('\n=== Loading Program Folders for Year $_selectedYear ===');
       final token = await AuthService.getAccessToken();
       final response = await ApiService.post(
         endpoint: ApiConfig.programImages,
@@ -47,36 +207,114 @@ class _ProgramImagesScreenState extends State<ProgramImagesScreen> {
         token: token,
       );
 
-      if (response['status'] == 200) {
-        // Group images by program name
-        final Map<String, List<Map<String, dynamic>>> programGroups = {};
+      print('API Response Status: ${response['status']}');
+      print('Raw Response: ${json.encode(response)}');
 
-        for (var item in response['payload']) {
-          final programName = item['ProgramName']['programName'];
-          if (!programGroups.containsKey(programName)) {
-            programGroups[programName] = [];
-          }
-          programGroups[programName]!.add(item);
+      if (response['status'] == 200) {
+        print('\nProcessing API Response:');
+
+        // Get programs from the root level
+        final List<dynamic> programs = response['programs'] ?? [];
+        print('Total programs: ${programs.length}');
+
+        // Get all images from payload
+        final List<dynamic> allImages = response['payload'] ?? [];
+        print('Total images: ${allImages.length}');
+
+        // Create a map to store program images using both name and ID as key
+        final Map<String, List<Map<String, dynamic>>> programImages = {};
+
+        // First, initialize the map with all programs
+        for (var program in programs) {
+          final programName = program['programName'];
+          final programId = program['id'].toString();
+          // Create a unique key combining name and ID
+          final uniqueKey = '$programName-$programId';
+          programImages[uniqueKey] = [];
+          print('Initialized program: $programName (ID: $programId)');
         }
 
+        // Then, assign images to their respective programs
+        for (var image in allImages) {
+          final programName = image['ProgramName']['programName'];
+          final programId = image['ProgramName']['id'].toString();
+          // Use the same unique key format
+          final uniqueKey = '$programName-$programId';
+          if (programImages.containsKey(uniqueKey)) {
+            programImages[uniqueKey]!.add(image);
+          }
+        }
+
+        print('\nProgram Images Distribution:');
+        programImages.forEach((key, images) {
+          final parts = key.split('-');
+          final name = parts[0];
+          final id = parts[1];
+          print('Program: $name (ID: $id)');
+          print('Number of images: ${images.length}');
+        });
+
+        // Sort programs by expiry date in descending order
+        programs.sort((a, b) {
+          final DateTime? endDateA = a['prog_expire_date'] != null
+              ? DateTime.parse(a['prog_expire_date'])
+              : null;
+          final DateTime? endDateB = b['prog_expire_date'] != null
+              ? DateTime.parse(b['prog_expire_date'])
+              : null;
+
+          // Handle null dates by putting them at the end
+          if (endDateA == null && endDateB == null) return 0;
+          if (endDateA == null) return 1;
+          if (endDateB == null) return -1;
+
+          // Reverse the comparison for descending order
+          return endDateB.compareTo(endDateA);
+        });
+
         setState(() {
-          _folders = programGroups.entries.map((entry) {
+          _folders = programs.map((program) {
+            final programName = program['programName'];
+            final programId = program['id'].toString();
+            final programImage = program['prog_image'];
+            final uniqueKey = '$programName-$programId';
+            final images = programImages[uniqueKey] ?? [];
+            final endDate = program['prog_expire_date'] != null
+                ? DateTime.parse(program['prog_expire_date'])
+                : null;
+
+            print('\nCreating folder for: $programName (ID: $programId)');
+            print('Program Image: $programImage');
+            print(
+                'Expiry Date: ${endDate?.toIso8601String() ?? 'No expiry date'}');
+            print('Number of images: ${images.length}');
+
             return ProgramFolder(
-              id: entry.value[0]['ProgramName']['id'].toString(),
-              name: entry.key,
-              images: entry.value.map((image) {
+              id: programId,
+              name: programName,
+              programImage: programImage,
+              images: images.map((image) {
                 return ProgramImage(
                   id: image['id'].toString(),
                   url: image['image'],
-                  programId: image['ProgramName']['id'].toString(),
-                  createdAt:
-                      DateTime.now(), // Since createdAt is not in response
+                  programId: programId,
+                  createdAt: DateTime.now(),
                 );
               }).toList(),
             );
           }).toList();
         });
+
+        print('\nFinal Folders List (Sorted by End Date):');
+        print('Total folders created: ${_folders.length}');
+        _folders.forEach((folder) {
+          print('\nFolder: ${folder.name} (ID: ${folder.id})');
+          print('Program Image: ${folder.programImage}');
+          print('Number of images: ${folder.images.length}');
+        });
       } else {
+        print('\nError Response:');
+        print('Message: ${response['message']}');
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -86,6 +324,9 @@ class _ProgramImagesScreenState extends State<ProgramImagesScreen> {
         );
       }
     } catch (e) {
+      print('\nException occurred:');
+      print('Error: $e');
+      print('Stack trace: ${StackTrace.current}');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -99,161 +340,7 @@ class _ProgramImagesScreenState extends State<ProgramImagesScreen> {
           _isLoading = false;
         });
       }
-    }
-  }
-
-  Future<void> _createNewFolder() async {
-    final TextEditingController nameController = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'Create New Program Folder',
-          style: GoogleFonts.poppins(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        content: TextField(
-          controller: nameController,
-          decoration: InputDecoration(
-            labelText: 'Program Name',
-            hintText: 'Enter program name',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, nameController.text),
-            child: const Text('Create'),
-          ),
-        ],
-      ),
-    );
-
-    if (result != null && result.isNotEmpty) {
-      setState(() {
-        _folders.add(
-          ProgramFolder(
-            id: DateTime.now().millisecondsSinceEpoch.toString(),
-            name: result,
-            images: [],
-          ),
-        );
-      });
-    }
-  }
-
-  Future<void> _uploadImages() async {
-    if (_selectedFolder == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a program folder first'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    try {
-      final List<XFile> images = await _picker.pickMultiImage();
-      if (images.isEmpty) return;
-
-      setState(() {
-        _isLoading = true;
-      });
-
-      for (final image in images) {
-        final File imageFile = File(image.path);
-        final response = await ApiService.uploadImage(
-          endpoint: '${ApiConfig.uploadProgramImage}/${_selectedFolder!.id}',
-          imageFile: imageFile,
-        );
-
-        if (response['status'] != 200) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(response['message'] ?? 'Failed to upload image'),
-              backgroundColor: Colors.red,
-            ),
-          );
-          break;
-        }
-      }
-
-      await _loadFolders();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Images uploaded successfully'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error uploading images: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _deleteImage(String imageId) async {
-    try {
-      setState(() {
-        _isLoading = true;
-      });
-
-      final response = await ApiService.delete(
-        endpoint: '${ApiConfig.programImages}/image/$imageId',
-      );
-
-      if (response['status'] == 200) {
-        await _loadFolders();
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Image deleted successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(response['message'] ?? 'Failed to delete image'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error deleting image: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      print('\n=== Program Folders Loading Completed ===\n');
     }
   }
 
@@ -269,8 +356,9 @@ class _ProgramImagesScreenState extends State<ProgramImagesScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.create_new_folder),
-            onPressed: _createNewFolder,
+            icon: const Icon(Icons.add),
+            tooltip: 'Create New Program',
+            onPressed: _showNewFolderDialog,
           ),
         ],
       ),
@@ -334,33 +422,21 @@ class _ProgramImagesScreenState extends State<ProgramImagesScreen> {
                                   color: Colors.grey[600],
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              ElevatedButton.icon(
-                                onPressed: _createNewFolder,
-                                icon: const Icon(Icons.create_new_folder),
-                                label: const Text('Create New Program'),
-                              ),
                             ],
                           ),
                         )
-                      : GridView.builder(
+                      : ListView.builder(
                           padding: const EdgeInsets.all(16),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 16,
-                            mainAxisSpacing: 16,
-                            childAspectRatio: 1.2,
-                          ),
                           itemCount: _folders.length,
                           itemBuilder: (context, index) {
                             final folder = _folders[index];
-                            return GestureDetector(
-                              onTap: () async {
-                                // Check if it's a new folder (timestamp-based ID)
-                                if (folder.id.length > 10) {
-                                  // For new folders, navigate directly
-                                  if (!mounted) return;
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: InkWell(
+                                onTap: () {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
@@ -370,74 +446,95 @@ class _ProgramImagesScreenState extends State<ProgramImagesScreen> {
                                       ),
                                     ),
                                   );
-                                } else {
-                                  // For existing folders, navigate to gallery screen
-                                  if (!mounted) return;
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          ProgramImageGalleryScreen(
-                                        folder: folder,
+                                },
+                                borderRadius: BorderRadius.circular(12),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      // Program Image
+                                      Container(
+                                        width: 160,
+                                        height: 84,
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[200],
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          child: folder.programImage != null &&
+                                                  folder
+                                                      .programImage!.isNotEmpty
+                                              ? CachedNetworkImage(
+                                                  imageUrl: folder.programImage!
+                                                          .startsWith('http')
+                                                      ? folder.programImage!
+                                                      : '${ApiConfig.baseUrl}${folder.programImage!.startsWith('/') ? folder.programImage!.substring(1) : folder.programImage!}',
+                                                  fit: BoxFit.cover,
+                                                  placeholder: (context, url) =>
+                                                      Center(
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      valueColor:
+                                                          AlwaysStoppedAnimation<
+                                                              Color>(
+                                                        Theme.of(context)
+                                                            .primaryColor,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  errorWidget:
+                                                      (context, url, error) {
+                                                    print(
+                                                        'Error loading program image: $error');
+                                                    print(
+                                                        'Program Image URL: ${folder.programImage}');
+                                                    return _buildPlaceholderImage();
+                                                  },
+                                                )
+                                              : _buildPlaceholderImage(),
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                }
-                              },
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: _selectedFolder?.id == folder.id
-                                      ? Theme.of(context)
-                                          .primaryColor
-                                          .withOpacity(0.1)
-                                      : Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: _selectedFolder?.id == folder.id
-                                        ? Theme.of(context).primaryColor
-                                        : Colors.grey[300]!,
-                                    width: 2,
+                                      const SizedBox(width: 16),
+                                      // Program Details
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              folder.name,
+                                              style: GoogleFonts.poppins(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 20,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Row(
+                                              children: [
+                                                Icon(Icons.photo_library,
+                                                    size: 16,
+                                                    color: Colors.grey[600]),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  '${folder.images.length} images',
+                                                  style: GoogleFonts.poppins(
+                                                    color: Colors.grey[600],
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.grey.withOpacity(0.1),
-                                      spreadRadius: 1,
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.folder,
-                                      size: 48,
-                                      color: _selectedFolder?.id == folder.id
-                                          ? Theme.of(context).primaryColor
-                                          : Colors.grey[600],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      folder.name,
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w500,
-                                        color: _selectedFolder?.id == folder.id
-                                            ? Theme.of(context).primaryColor
-                                            : Colors.black87,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '${folder.images.length} images',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 12,
-                                        color: Colors.grey[600],
-                                      ),
-                                    ),
-                                  ],
                                 ),
                               ),
                             );
@@ -446,12 +543,30 @@ class _ProgramImagesScreenState extends State<ProgramImagesScreen> {
                 ),
               ],
             ),
-      floatingActionButton: _selectedFolder != null
-          ? FloatingActionButton(
-              onPressed: _uploadImages,
-              child: const Icon(Icons.add_photo_alternate),
-            )
-          : null,
+    );
+  }
+
+  Widget _buildPlaceholderImage() {
+    return Container(
+      color: Colors.grey[200],
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.image,
+            size: 32,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'No Image',
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              color: Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

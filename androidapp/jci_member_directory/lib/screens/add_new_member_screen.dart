@@ -103,6 +103,15 @@ class _AddNewMemberScreenState extends State<AddNewMemberScreen> {
     return date.isAfter(later18thBirthday);
   }
 
+  // Helper method to capitalize first letter of each word
+  String _capitalizeFirstLetterOfEachWord(String text) {
+    if (text.isEmpty) return text;
+    return text.split(' ').map((word) {
+      if (word.isEmpty) return word;
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -704,24 +713,41 @@ class _AddNewMemberScreenState extends State<AddNewMemberScreen> {
           return;
         }
 
-        // Format dates to YYYY-MM-DD
-        String formatDate(String dateStr) {
-          if (dateStr.isEmpty) return "1900-01-01";
-          final parts = dateStr.split('/');
-          return "${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}";
+        // Format dates
+        String formatDate(String? dateStr) {
+          if (dateStr == null || dateStr.isEmpty) return "";
+          try {
+            // Split the date string by '/'
+            final parts = dateStr.split('/');
+            if (parts.length != 3) return "";
+
+            // Create DateTime object from parts
+            final date = DateTime(
+              int.parse(parts[2]), // year
+              int.parse(parts[1]), // month
+              int.parse(parts[0]), // day
+            );
+
+            // Format to YYYY-MM-DD
+            return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+          } catch (e) {
+            print('Error formatting date: $e');
+            return "";
+          }
         }
 
         final response = await ApiService.post(
           endpoint: 'api/admin/addmember/',
           body: {
-            "jcName":
-                _jcNameController.text.isEmpty ? "" : _jcNameController.text,
+            "jcName": _jcNameController.text.isEmpty
+                ? ""
+                : _capitalizeFirstLetterOfEachWord(_jcNameController.text),
             "jcMobile": _jcMobileController.text.isEmpty
                 ? ""
                 : _jcMobileController.text,
             "jcrtName": _jcrtNameController.text.isEmpty
                 ? ""
-                : _jcrtNameController.text,
+                : _capitalizeFirstLetterOfEachWord(_jcrtNameController.text),
             "jcrtMobile": _jcrtMobileController.text.isEmpty
                 ? ""
                 : _jcrtMobileController.text,
@@ -757,8 +783,8 @@ class _AddNewMemberScreenState extends State<AddNewMemberScreen> {
                 _jcrtOccupationAddressController.text.isEmpty
                     ? ""
                     : _jcrtOccupationAddressController.text,
-            "jcpost": _selectedJCPost ?? "",
-            "jcrtpost": _selectedJCRTPost ?? "",
+            "jcPost": _selectedJCPost ?? "",
+            "jcrtPost": _selectedJCRTPost ?? "",
             "jcImage": _jcImagePath ?? "",
             "jcrtImage": _jcrtImagePath ?? "",
             "searchteg": ""

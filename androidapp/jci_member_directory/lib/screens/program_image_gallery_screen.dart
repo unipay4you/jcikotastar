@@ -912,34 +912,28 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: ImageCacheManager.hasImage(image.url)
-                                ? Image.memory(
-                                    ImageCacheManager.getImage(image.url)!,
-                                    fit: BoxFit.cover,
-                                    width: double.infinity,
-                                    height: double.infinity,
-                                  )
-                                : CachedNetworkImage(
-                                    imageUrl: image.url,
-                                    fit: BoxFit.cover,
-                                    width: double.infinity,
-                                    height: double.infinity,
-                                    placeholder: (context, url) => Container(
-                                      color: Colors.grey[200],
-                                      child: const Center(
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                    ),
-                                    errorWidget: (context, url, error) {
-                                      print('Error loading image: $error');
-                                      return Container(
-                                        color: Colors.grey[200],
-                                        child: const Center(
-                                          child: Icon(Icons.error),
-                                        ),
-                                      );
-                                    },
+                            child: CachedNetworkImage(
+                              imageUrl: image.url,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
+                              placeholder: (context, url) => Container(
+                                color: Colors.grey[200],
+                                child: const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) {
+                                print('Error loading image: $error');
+                                print('Image URL: ${image.url}');
+                                return Container(
+                                  color: Colors.grey[200],
+                                  child: const Center(
+                                    child: Icon(Icons.error),
                                   ),
+                                );
+                              },
+                            ),
                           ),
                           if (_isSelectionMode)
                             Positioned(
@@ -967,27 +961,6 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
                                     : null,
                               ),
                             ),
-                          // Image size overlay
-                          Positioned(
-                            bottom: 4,
-                            left: 4,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.7),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                ImageCacheManager.getSize(image.url) ??
-                                    'Loading...',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          ),
                           // Delete button (only show when not in selection mode)
                           if (!_isSelectionMode)
                             Positioned(

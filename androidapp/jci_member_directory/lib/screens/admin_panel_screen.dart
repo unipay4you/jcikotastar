@@ -10,6 +10,7 @@ import 'dart:convert';
 import '../services/auth_service.dart';
 import 'member_list_screen.dart';
 import 'admin/edit_member_screen.dart';
+import 'admin/program_management_screen.dart';
 
 class AdminMemberListScreen extends StatefulWidget {
   const AdminMemberListScreen({
@@ -32,6 +33,14 @@ class _AdminMemberListScreenState extends State<AdminMemberListScreen> {
   void initState() {
     super.initState();
     _loadMembers();
+    _searchController.addListener(_filterMembers);
+  }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_filterMembers);
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadMembers() async {
@@ -96,69 +105,164 @@ class _AdminMemberListScreenState extends State<AdminMemberListScreen> {
     }
   }
 
-  void _toggleFilter() {
+  void _filterMembers() {
+    final query = _searchController.text.toLowerCase();
     setState(() {
-      _showActiveOnly = !_showActiveOnly;
-      if (_showActiveOnly) {
-        _filteredMembers =
-            _members.where((member) => member['is_active'] == true).toList();
+      if (query.isEmpty) {
+        // Apply only active/inactive filter
+        _filteredMembers = _showActiveOnly
+            ? _members.where((member) => member['is_active'] == true).toList()
+            : _members;
       } else {
-        _filteredMembers = _members;
-      }
-      // Reapply search filter if there's any search text
-      if (_searchController.text.isNotEmpty) {
-        _filterMembers(_searchController.text);
+        // Apply both search filter and active/inactive filter
+        List<dynamic> searchFiltered = _members;
+
+        // Apply search filter
+        if (query == 'lgb') {
+          searchFiltered = _members.where((member) {
+            final position = member['jcpost']?.toString().toLowerCase() ?? '';
+            return !position.contains('general member') &&
+                !position.contains('new member');
+          }).toList();
+        } else if (query == 'eb') {
+          searchFiltered = _members.where((member) {
+            final position = member['jcpost']?.toString().toLowerCase() ?? '';
+            return position.contains('pp') ||
+                position.contains('ipp') ||
+                position.contains('president') ||
+                position.contains('secretary') ||
+                position.contains('treasurer');
+          }).toList();
+        } else if (query == 'all') {
+          searchFiltered = _members;
+        } else {
+          searchFiltered = _members.where((member) {
+            final name = member['jcName']?.toString().toLowerCase() ?? '';
+            final position = member['jcpost']?.toString().toLowerCase() ?? '';
+            final email = member['jcEmail']?.toString().toLowerCase() ?? '';
+            final phone =
+                member['jcMobile']?['phone_number']?.toString().toLowerCase() ??
+                    '';
+            final bloodGroup =
+                member['jcBloodGroup']?.toString().toLowerCase() ?? '';
+            final qualification =
+                member['jcQualification']?.toString().toLowerCase() ?? '';
+            final occupation =
+                member['jcOccupation']?.toString().toLowerCase() ?? '';
+            final firmName =
+                member['jcFirmName']?.toString().toLowerCase() ?? '';
+            final address =
+                member['jcHomeAddress']?.toString().toLowerCase() ?? '';
+            final jcrtName = member['jcrtName']?.toString().toLowerCase() ?? '';
+            final jcrtPosition =
+                member['jcrtpost']?.toString().toLowerCase() ?? '';
+            final jcrtEmail =
+                member['jcrtEmail']?.toString().toLowerCase() ?? '';
+            final jcrtPhone = member['jcrtMobile']?['phone_number']
+                    ?.toString()
+                    .toLowerCase() ??
+                '';
+
+            return name.contains(query) ||
+                position.contains(query) ||
+                email.contains(query) ||
+                phone.contains(query) ||
+                bloodGroup.contains(query) ||
+                qualification.contains(query) ||
+                occupation.contains(query) ||
+                firmName.contains(query) ||
+                address.contains(query) ||
+                jcrtName.contains(query) ||
+                jcrtPosition.contains(query) ||
+                jcrtEmail.contains(query) ||
+                jcrtPhone.contains(query);
+          }).toList();
+        }
+
+        // Apply active/inactive filter to search results
+        _filteredMembers = _showActiveOnly
+            ? searchFiltered
+                .where((member) => member['is_active'] == true)
+                .toList()
+            : searchFiltered;
       }
     });
   }
 
-  void _filterMembers(String query) {
+  void _toggleFilter() {
     setState(() {
-      final baseList = _showActiveOnly
-          ? _members.where((member) => member['is_active'] == true).toList()
-          : _members;
-
-      _filteredMembers = baseList.where((member) {
-        final searchQuery = query.toLowerCase();
-
-        // Search in all relevant fields
-        final name = member['jcName']?.toString().toLowerCase() ?? '';
-        final position = member['jcpost']?.toString().toLowerCase() ?? '';
-        final email = member['jcEmail']?.toString().toLowerCase() ?? '';
-        final phone =
-            member['jcMobile']?['phone_number']?.toString().toLowerCase() ?? '';
-        final bloodGroup =
-            member['jcBloodGroup']?.toString().toLowerCase() ?? '';
-        final qualification =
-            member['jcQualification']?.toString().toLowerCase() ?? '';
-        final occupation =
-            member['jcOccupation']?.toString().toLowerCase() ?? '';
-        final firmName = member['jcFirmName']?.toString().toLowerCase() ?? '';
-        final address = member['jcHomeAddress']?.toString().toLowerCase() ?? '';
-
-        // Search in JCRT fields if available
-        final jcrtName = member['jcrtName']?.toString().toLowerCase() ?? '';
-        final jcrtPosition = member['jcrtpost']?.toString().toLowerCase() ?? '';
-        final jcrtEmail = member['jcrtEmail']?.toString().toLowerCase() ?? '';
-        final jcrtPhone =
-            member['jcrtMobile']?['phone_number']?.toString().toLowerCase() ??
-                '';
-
-        return name.contains(searchQuery) ||
-            position.contains(searchQuery) ||
-            email.contains(searchQuery) ||
-            phone.contains(searchQuery) ||
-            bloodGroup.contains(searchQuery) ||
-            qualification.contains(searchQuery) ||
-            occupation.contains(searchQuery) ||
-            firmName.contains(searchQuery) ||
-            address.contains(searchQuery) ||
-            jcrtName.contains(searchQuery) ||
-            jcrtPosition.contains(searchQuery) ||
-            jcrtEmail.contains(searchQuery) ||
-            jcrtPhone.contains(searchQuery);
-      }).toList();
+      _showActiveOnly = !_showActiveOnly;
+      _filterMembers(); // Reapply all filters
     });
+  }
+
+  // Add helper method to show filter options
+  void _showFilterOptions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Filter Members',
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.people),
+                title: Text(
+                  'LGB Members (Except General/New Members)',
+                  style: GoogleFonts.poppins(),
+                ),
+                onTap: () {
+                  _searchController.text = 'lgb';
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.group),
+                title: Text(
+                  'All Members',
+                  style: GoogleFonts.poppins(),
+                ),
+                onTap: () {
+                  _searchController.text = 'all';
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.admin_panel_settings),
+                title: Text(
+                  'EB Members (PP, IPP, President, Secretary, Treasurer)',
+                  style: GoogleFonts.poppins(),
+                ),
+                onTap: () {
+                  _searchController.text = 'eb';
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.clear),
+                title: Text(
+                  'Clear Filter',
+                  style: GoogleFonts.poppins(),
+                ),
+                onTap: () {
+                  _searchController.clear();
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -181,12 +285,10 @@ class _AdminMemberListScreenState extends State<AdminMemberListScreen> {
               ),
             ),
             Text(
-              _showActiveOnly
-                  ? '$activeMembers Active Members'
-                  : '$totalMembers Total Members',
+              '${_filteredMembers.length} Members',
               style: GoogleFonts.poppins(
                 fontSize: 12,
-                color: _showActiveOnly ? Colors.green : Colors.blue,
+                color: Colors.grey[600],
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -225,19 +327,36 @@ class _AdminMemberListScreenState extends State<AdminMemberListScreen> {
                   // Search Bar
                   Padding(
                     padding: const EdgeInsets.all(16.0),
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: InputDecoration(
-                        hintText: 'Search members...',
-                        prefixIcon: const Icon(Icons.search),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide.none,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              hintText: 'Search members...',
+                              prefixIcon: const Icon(Icons.search),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide.none,
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey[200],
+                            ),
+                          ),
                         ),
-                        filled: true,
-                        fillColor: Colors.grey[200],
-                      ),
-                      onChanged: _filterMembers,
+                        const SizedBox(width: 10),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: GestureDetector(
+                            onTap: _showFilterOptions,
+                            child: const Icon(Icons.filter_list),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   // Member List
@@ -1229,6 +1348,20 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (context) => const ProgramImagesScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _buildActionButton(
+                        title: 'Programs',
+                        icon: Icons.event,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const ProgramManagementScreen(),
                             ),
                           );
                         },

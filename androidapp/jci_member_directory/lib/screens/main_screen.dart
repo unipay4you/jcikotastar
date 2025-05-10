@@ -20,6 +20,7 @@ import 'package:jci_member_directory/screens/member_list_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:android_intent_plus/flag.dart';
+import 'user/user_programs_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
@@ -37,33 +38,19 @@ class _MainScreenState extends State<MainScreen> {
   Map<String, dynamic>? _userData;
   int _currentCarouselIndex = 0;
   List<dynamic> _members = [];
-
-  // Sample carousel items (replace with your actual data)
-  final List<Map<String, dynamic>> _carouselItems = [
-    {
-      'image':
-          'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1471&q=80',
-      'title': 'Welcome to JCI',
-      'description': 'Join our community of young active citizens',
-    },
-    {
-      'image':
-          'https://images.unsplash.com/photo-1552664730-d307ca884978?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80',
-      'title': 'Leadership Development',
-      'description': 'Grow your leadership skills with JCI',
-    },
-    {
-      'image':
-          'https://images.unsplash.com/photo-1593113598332-cd288d649433?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80',
-      'title': 'Community Service',
-      'description': 'Make a difference in your community',
-    },
-  ];
+  List<dynamic> _filteredMembers = [];
+  List<Map<String, dynamic>> _carouselItems = [];
 
   // Sample quick action buttons
   final List<Map<String, dynamic>> _quickActions = [
     {'icon': Icons.people, 'label': 'Members', 'color': Colors.blue},
-    {'icon': Icons.event, 'label': 'Events', 'color': Colors.green},
+    {
+      'icon': Icons.event,
+      'label': 'Upcoming Events',
+      'color': Colors.green,
+      'onTap': (context) => Navigator.push(context,
+          MaterialPageRoute(builder: (context) => const UserProgramsScreen()))
+    },
     {
       'icon': Icons.photo_library,
       'label': 'Gallery',
@@ -73,24 +60,8 @@ class _MainScreenState extends State<MainScreen> {
           MaterialPageRoute(
               builder: (context) => const UserProgramImagesScreen()))
     },
-    {'icon': Icons.article, 'label': 'News', 'color': Colors.purple},
+    {'icon': Icons.message, 'label': 'Greetings', 'color': Colors.purple},
     {'icon': Icons.contact_phone, 'label': 'Contact', 'color': Colors.red},
-  ];
-
-  // Sample featured items
-  final List<Map<String, dynamic>> _featuredItems = [
-    {'title': 'Upcoming Events', 'icon': Icons.event, 'color': Colors.blue},
-    {'title': 'Latest News', 'icon': Icons.article, 'color': Colors.green},
-    {
-      'title': 'Photo Gallery',
-      'icon': Icons.photo_library,
-      'color': Colors.orange
-    },
-    {
-      'title': 'Achievements',
-      'icon': Icons.emoji_events,
-      'color': Colors.purple
-    },
   ];
 
   @override
@@ -98,6 +69,196 @@ class _MainScreenState extends State<MainScreen> {
     super.initState();
     _loadInitialData();
     _requestPermissions();
+    _searchController.addListener(_filterMembers);
+  }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_filterMembers);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _filterMembers() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      if (query.isEmpty) {
+        _filteredMembers = List.from(_members)
+          ..sort((a, b) {
+            String nameA = (a['jcName'] ?? '').toString().trim().toLowerCase();
+            String nameB = (b['jcName'] ?? '').toString().trim().toLowerCase();
+            return nameA.compareTo(nameB);
+          });
+      } else {
+        // Special case for LGB filter (showing all members except general/new members)
+        if (query == 'lgb') {
+          _filteredMembers = _members.where((member) {
+            final position = member['jcpost']?.toString().toLowerCase() ?? '';
+            return !position.contains('general member') &&
+                !position.contains('new member');
+          }).toList()
+            ..sort((a, b) {
+              String nameA =
+                  (a['jcName'] ?? '').toString().trim().toLowerCase();
+              String nameB =
+                  (b['jcName'] ?? '').toString().trim().toLowerCase();
+              return nameA.compareTo(nameB);
+            });
+        }
+        // Special case for EB members (PP, IPP, President, Secretary, Treasurer)
+        else if (query == 'eb') {
+          _filteredMembers = _members.where((member) {
+            final position = member['jcpost']?.toString().toLowerCase() ?? '';
+            return position.contains('pp') ||
+                position.contains('ipp') ||
+                position.contains('president') ||
+                position.contains('secretary') ||
+                position.contains('treasurer');
+          }).toList()
+            ..sort((a, b) {
+              String nameA =
+                  (a['jcName'] ?? '').toString().trim().toLowerCase();
+              String nameB =
+                  (b['jcName'] ?? '').toString().trim().toLowerCase();
+              return nameA.compareTo(nameB);
+            });
+        }
+        // Show all members
+        else if (query == 'all') {
+          _filteredMembers = List.from(_members)
+            ..sort((a, b) {
+              String nameA =
+                  (a['jcName'] ?? '').toString().trim().toLowerCase();
+              String nameB =
+                  (b['jcName'] ?? '').toString().trim().toLowerCase();
+              return nameA.compareTo(nameB);
+            });
+        }
+        // Regular search across all fields
+        else {
+          _filteredMembers = _members.where((member) {
+            // Search in all relevant fields
+            final name = member['jcName']?.toString().toLowerCase() ?? '';
+            final position = member['jcpost']?.toString().toLowerCase() ?? '';
+            final email = member['jcEmail']?.toString().toLowerCase() ?? '';
+            final phone =
+                member['jcMobile']?['phone_number']?.toString().toLowerCase() ??
+                    '';
+            final bloodGroup =
+                member['jcBloodGroup']?.toString().toLowerCase() ?? '';
+            final qualification =
+                member['jcQualification']?.toString().toLowerCase() ?? '';
+            final occupation =
+                member['jcOccupation']?.toString().toLowerCase() ?? '';
+            final firmName =
+                member['jcFirmName']?.toString().toLowerCase() ?? '';
+            final address =
+                member['jcHomeAddress']?.toString().toLowerCase() ?? '';
+
+            // Search in JCRT fields if available
+            final jcrtName = member['jcrtName']?.toString().toLowerCase() ?? '';
+            final jcrtPosition =
+                member['jcrtpost']?.toString().toLowerCase() ?? '';
+            final jcrtEmail =
+                member['jcrtEmail']?.toString().toLowerCase() ?? '';
+            final jcrtPhone = member['jcrtMobile']?['phone_number']
+                    ?.toString()
+                    .toLowerCase() ??
+                '';
+
+            return name.contains(query) ||
+                position.contains(query) ||
+                email.contains(query) ||
+                phone.contains(query) ||
+                bloodGroup.contains(query) ||
+                qualification.contains(query) ||
+                occupation.contains(query) ||
+                firmName.contains(query) ||
+                address.contains(query) ||
+                jcrtName.contains(query) ||
+                jcrtPosition.contains(query) ||
+                jcrtEmail.contains(query) ||
+                jcrtPhone.contains(query);
+          }).toList()
+            ..sort((a, b) {
+              String nameA =
+                  (a['jcName'] ?? '').toString().trim().toLowerCase();
+              String nameB =
+                  (b['jcName'] ?? '').toString().trim().toLowerCase();
+              return nameA.compareTo(nameB);
+            });
+        }
+      }
+    });
+  }
+
+  // Add helper method to show filter options
+  void _showFilterOptions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Filter Members',
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.people),
+                title: Text(
+                  'LGB Members (Except General/New Members)',
+                  style: GoogleFonts.poppins(),
+                ),
+                onTap: () {
+                  _searchController.text = 'lgb';
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.group),
+                title: Text(
+                  'All Members',
+                  style: GoogleFonts.poppins(),
+                ),
+                onTap: () {
+                  _searchController.text = 'all';
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.admin_panel_settings),
+                title: Text(
+                  'EB Members (PP, IPP, President, Secretary, Treasurer)',
+                  style: GoogleFonts.poppins(),
+                ),
+                onTap: () {
+                  _searchController.text = 'eb';
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.clear),
+                title: Text(
+                  'Clear Filter',
+                  style: GoogleFonts.poppins(),
+                ),
+                onTap: () {
+                  _searchController.clear();
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _loadInitialData() async {
@@ -131,6 +292,62 @@ class _MainScreenState extends State<MainScreen> {
               response['profile']['user_type']?.toString().toUpperCase() ?? '';
           // Extract members data from the response
           _members = response['members'] ?? [];
+          _filteredMembers = _members;
+
+          // Extract program images for carousel
+          if (response['programs'] != null) {
+            _carouselItems = (response['programs'] as List).map((program) {
+              return {
+                'image': program['prog_image'] != null
+                    ? '${ApiConfig.baseUrl}${program['prog_image']}'
+                    : 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1471&q=80',
+                'title': program['prog_name'] ?? 'Program',
+                'description':
+                    program['prog_description'] ?? 'No description available',
+                'prog_date': program['prog_date'],
+                'prog_time': program['prog_time'],
+                'prog_venue': program['prog_venue'],
+                'prog_organizer': program['prog_organizer'],
+                'prog_contact': program['prog_contact'],
+                'prog_id': program['id'],
+                'prog_status': program['prog_status'],
+                'prog_type': program['prog_type'],
+                'prog_category': program['prog_category'],
+                'prog_target_audience': program['prog_target_audience'],
+                'prog_objectives': program['prog_objectives'],
+                'prog_outcomes': program['prog_outcomes'],
+                'prog_budget': program['prog_budget'],
+                'prog_sponsors': program['prog_sponsors'],
+                'prog_partners': program['prog_partners'],
+                'prog_created_at': program['created_at'],
+                'prog_updated_at': program['updated_at'],
+              };
+            }).toList();
+          }
+
+          // If no programs found, use default carousel items
+          if (_carouselItems.isEmpty) {
+            _carouselItems = [
+              {
+                'image':
+                    'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1471&q=80',
+                'title': 'Welcome to JCI',
+                'description': 'Join our community of young active citizens',
+              },
+              {
+                'image':
+                    'https://images.unsplash.com/photo-1552664730-d307ca884978?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80',
+                'title': 'Leadership Development',
+                'description': 'Grow your leadership skills with JCI',
+              },
+              {
+                'image':
+                    'https://images.unsplash.com/photo-1593113598332-cd288d649433?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80',
+                'title': 'Community Service',
+                'description': 'Make a difference in your community',
+              },
+            ];
+          }
 
           // Print detailed members data
           print('=== Members Data from Profile Response ===');
@@ -477,6 +694,13 @@ class _MainScreenState extends State<MainScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                Text(
+                  '${_filteredMembers.length} Members',
+                  style: GoogleFonts.poppins(
+                    color: Colors.grey[600],
+                    fontSize: 12,
+                  ),
+                ),
               ],
             ),
           ],
@@ -668,50 +892,62 @@ class _MainScreenState extends State<MainScreen> {
               items: _carouselItems.map((item) {
                 return Builder(
                   builder: (BuildContext context) {
-                    return Container(
-                      width: MediaQuery.of(context).size.width,
-                      margin: const EdgeInsets.symmetric(horizontal: 5.0),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(15),
-                        image: DecorationImage(
-                          image: NetworkImage(item['image']),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ProgramDetailsScreen(
+                              program: item,
+                            ),
+                          ),
+                        );
+                      },
                       child: Container(
+                        width: MediaQuery.of(context).size.width,
+                        margin: const EdgeInsets.symmetric(horizontal: 5.0),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(15),
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withOpacity(0.7),
-                            ],
+                          image: DecorationImage(
+                            image: NetworkImage(item['image']),
+                            fit: BoxFit.cover,
                           ),
                         ),
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item['title'],
-                              style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(15),
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                Colors.black.withOpacity(0.7),
+                              ],
                             ),
-                            const SizedBox(height: 5),
-                            Text(
-                              item['description'],
-                              style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontSize: 14,
+                          ),
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item['title'],
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 5),
+                              Text(
+                                item['description'],
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     );
@@ -777,65 +1013,6 @@ class _MainScreenState extends State<MainScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Featured Items Grid
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 15,
-                  mainAxisSpacing: 15,
-                  childAspectRatio: 1.5,
-                ),
-                itemCount: _featuredItems.length,
-                itemBuilder: (context, index) {
-                  final item = _featuredItems[index];
-                  return GestureDetector(
-                    onTap: () {
-                      if (item['title'] == 'Photo Gallery') {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                const UserProgramImagesScreen(),
-                          ),
-                        );
-                      }
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: item['color'].withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      padding: const EdgeInsets.all(15),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            item['icon'],
-                            color: item['color'],
-                            size: 30,
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            item['title'],
-                            style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 20),
-
             // Filter Bar
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -863,7 +1040,10 @@ class _MainScreenState extends State<MainScreen> {
                       color: Colors.grey[200],
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.filter_list),
+                    child: GestureDetector(
+                      onTap: _showFilterOptions,
+                      child: const Icon(Icons.filter_list),
+                    ),
                   ),
                 ],
               ),
@@ -875,9 +1055,9 @@ class _MainScreenState extends State<MainScreen> {
               child: ListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: _members.length,
+                itemCount: _filteredMembers.length,
                 itemBuilder: (context, index) {
-                  final member = _members[index];
+                  final member = _filteredMembers[index];
                   print('Building member tile for: ${member['jcName']}');
                   return Card(
                     margin: const EdgeInsets.only(bottom: 15),
@@ -899,7 +1079,16 @@ class _MainScreenState extends State<MainScreen> {
                             : null,
                       ),
                       title: Text(
-                        member['jcName'] ?? 'N/A',
+                        member['jcName'] != null
+                            ? member['jcName']
+                                .toString()
+                                .split(' ')
+                                .map((word) => word.isNotEmpty
+                                    ? word[0].toUpperCase() +
+                                        word.substring(1).toLowerCase()
+                                    : '')
+                                .join(' ')
+                            : 'N/A',
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w600,
                           fontSize: 16,
@@ -907,14 +1096,29 @@ class _MainScreenState extends State<MainScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      subtitle: Text(
-                        member['jcpost'] ?? 'General Member',
-                        style: GoogleFonts.poppins(
-                          color: Colors.grey[600],
-                          fontSize: 14,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            member['jcpost'] ?? 'General Member',
+                            style: GoogleFonts.poppins(
+                              color: Colors.grey[600],
+                              fontSize: 14,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (member['jcMobile']?['phone_number'] != null)
+                            Text(
+                              member['jcMobile']?['phone_number'] ?? '',
+                              style: GoogleFonts.poppins(
+                                color: Colors.grey[600],
+                                fontSize: 14,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                        ],
                       ),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -1167,5 +1371,232 @@ class SettingsScreen extends StatelessWidget {
         onTap: onTap,
       ),
     );
+  }
+}
+
+class ProgramDetailsScreen extends StatelessWidget {
+  final Map<String, dynamic> program;
+
+  const ProgramDetailsScreen({
+    Key? key,
+    required this.program,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          'Program Details',
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Program Image
+            Container(
+              width: double.infinity,
+              height: 250,
+              decoration: BoxDecoration(
+                image: DecorationImage(
+                  image: NetworkImage(program['image']),
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Program Title
+                  Text(
+                    program['title'],
+                    style: GoogleFonts.poppins(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Program Status
+                  if (program['prog_status'] != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(program['prog_status'])
+                            .withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        program['prog_status'].toString().toUpperCase(),
+                        style: GoogleFonts.poppins(
+                          color: _getStatusColor(program['prog_status']),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                  // Program Description
+                  Text(
+                    program['description'],
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  // Basic Information Section
+                  _buildSectionHeader('Basic Information'),
+                  if (program['prog_date'] != null) ...[
+                    _buildDetailRow('Date', program['prog_date']),
+                    const SizedBox(height: 12),
+                  ],
+                  if (program['prog_time'] != null) ...[
+                    _buildDetailRow('Time', program['prog_time']),
+                    const SizedBox(height: 12),
+                  ],
+                  if (program['prog_venue'] != null) ...[
+                    _buildDetailRow('Venue', program['prog_venue']),
+                    const SizedBox(height: 12),
+                  ],
+                  if (program['prog_type'] != null) ...[
+                    _buildDetailRow('Type', program['prog_type']),
+                    const SizedBox(height: 12),
+                  ],
+                  if (program['prog_category'] != null) ...[
+                    _buildDetailRow('Category', program['prog_category']),
+                    const SizedBox(height: 12),
+                  ],
+                  // Organizer Information Section
+                  _buildSectionHeader('Organizer Information'),
+                  if (program['prog_organizer'] != null) ...[
+                    _buildDetailRow('Organizer', program['prog_organizer']),
+                    const SizedBox(height: 12),
+                  ],
+                  if (program['prog_contact'] != null) ...[
+                    _buildDetailRow('Contact', program['prog_contact']),
+                    const SizedBox(height: 12),
+                  ],
+                  // Program Details Section
+                  _buildSectionHeader('Program Details'),
+                  if (program['prog_target_audience'] != null) ...[
+                    _buildDetailRow(
+                        'Target Audience', program['prog_target_audience']),
+                    const SizedBox(height: 12),
+                  ],
+                  if (program['prog_objectives'] != null) ...[
+                    _buildDetailRow('Objectives', program['prog_objectives']),
+                    const SizedBox(height: 12),
+                  ],
+                  if (program['prog_outcomes'] != null) ...[
+                    _buildDetailRow(
+                        'Expected Outcomes', program['prog_outcomes']),
+                    const SizedBox(height: 12),
+                  ],
+                  // Financial Information Section
+                  _buildSectionHeader('Financial Information'),
+                  if (program['prog_budget'] != null) ...[
+                    _buildDetailRow('Budget', program['prog_budget']),
+                    const SizedBox(height: 12),
+                  ],
+                  if (program['prog_sponsors'] != null) ...[
+                    _buildDetailRow('Sponsors', program['prog_sponsors']),
+                    const SizedBox(height: 12),
+                  ],
+                  if (program['prog_partners'] != null) ...[
+                    _buildDetailRow('Partners', program['prog_partners']),
+                    const SizedBox(height: 12),
+                  ],
+                  // Additional Information Section
+                  _buildSectionHeader('Additional Information'),
+                  if (program['prog_created_at'] != null) ...[
+                    _buildDetailRow(
+                        'Created', _formatDate(program['prog_created_at'])),
+                    const SizedBox(height: 12),
+                  ],
+                  if (program['prog_updated_at'] != null) ...[
+                    _buildDetailRow('Last Updated',
+                        _formatDate(program['prog_updated_at'])),
+                    const SizedBox(height: 12),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 24, bottom: 16),
+      child: Text(
+        title,
+        style: GoogleFonts.poppins(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Colors.blue,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 120,
+          child: Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[700],
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              color: Colors.black87,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Color _getStatusColor(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'upcoming':
+        return Colors.blue;
+      case 'ongoing':
+        return Colors.green;
+      case 'completed':
+        return Colors.grey;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _formatDate(String? dateStr) {
+    if (dateStr == null) return '';
+    try {
+      final date = DateTime.parse(dateStr);
+      return '${date.day}/${date.month}/${date.year}';
+    } catch (e) {
+      return dateStr;
+    }
   }
 }

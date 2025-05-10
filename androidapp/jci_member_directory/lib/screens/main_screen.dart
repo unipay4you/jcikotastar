@@ -21,6 +21,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:android_intent_plus/flag.dart';
 import 'user/user_programs_screen.dart';
+import 'user/user_greetings_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
@@ -41,28 +42,57 @@ class _MainScreenState extends State<MainScreen> {
   List<dynamic> _filteredMembers = [];
   List<Map<String, dynamic>> _carouselItems = [];
 
-  // Sample quick action buttons
-  final List<Map<String, dynamic>> _quickActions = [
-    {'icon': Icons.people, 'label': 'Members', 'color': Colors.blue},
-    {
-      'icon': Icons.event,
-      'label': 'Upcoming Events',
-      'color': Colors.green,
-      'onTap': (context) => Navigator.push(context,
-          MaterialPageRoute(builder: (context) => const UserProgramsScreen()))
-    },
-    {
-      'icon': Icons.photo_library,
-      'label': 'Gallery',
-      'color': Colors.orange,
-      'onTap': (context) => Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (context) => const UserProgramImagesScreen()))
-    },
-    {'icon': Icons.message, 'label': 'Greetings', 'color': Colors.purple},
-    {'icon': Icons.contact_phone, 'label': 'Contact', 'color': Colors.red},
-  ];
+  List<Map<String, dynamic>> _getQuickActions(BuildContext context) {
+    return [
+      {
+        'icon': Icons.event,
+        'label': 'Upcoming Events',
+        'color': Colors.green,
+        'onTap': () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const UserProgramsScreen()),
+          );
+        },
+      },
+      {
+        'icon': Icons.message,
+        'label': 'Greetings',
+        'color': Colors.purple,
+        'onTap': () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => UserGreetingsScreen(
+                      members: _members,
+                      userMobileBelongsTo:
+                          _profileData?['mobile_number_belongs_to']?.toString(),
+                    )),
+          );
+        },
+      },
+      {
+        'icon': Icons.photo_library,
+        'label': 'Gallery',
+        'color': Colors.orange,
+        'onTap': () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => const UserProgramImagesScreen()),
+          );
+        },
+      },
+      {
+        'icon': Icons.contact_phone,
+        'label': 'Contact',
+        'color': Colors.red,
+        'onTap': () {
+          // ... existing contact code ...
+        },
+      },
+    ];
+  }
 
   @override
   void initState() {
@@ -650,6 +680,8 @@ class _MainScreenState extends State<MainScreen> {
       print('Profile Image URL: $profileImageUrl');
     }
 
+    final quickActions = _getQuickActions(context);
+
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -692,13 +724,6 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                Text(
-                  '${_filteredMembers.length} Members',
-                  style: GoogleFonts.poppins(
-                    color: Colors.grey[600],
-                    fontSize: 12,
                   ),
                 ),
               ],
@@ -882,294 +907,336 @@ class _MainScreenState extends State<MainScreen> {
           ],
         ),
       ),
-      body: RefreshIndicator(
-        onRefresh: _refreshData,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          children: [
-            // Carousel Slider
-            FlutterCarousel(
-              items: _carouselItems.map((item) {
-                return Builder(
-                  builder: (BuildContext context) {
-                    return GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ProgramDetailsScreen(
-                              program: item,
-                            ),
-                          ),
-                        );
-                      },
-                      child: Container(
-                        width: MediaQuery.of(context).size.width,
-                        margin: const EdgeInsets.symmetric(horizontal: 5.0),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(15),
-                          image: DecorationImage(
-                            image: NetworkImage(item['image']),
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(15),
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.transparent,
-                                Colors.black.withOpacity(0.7),
-                              ],
-                            ),
-                          ),
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item['title'],
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                item['description'],
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                );
-              }).toList(),
-              options: CarouselOptions(
-                height: 200.0,
-                autoPlay: true,
-                enlargeCenterPage: true,
-                aspectRatio: 16 / 9,
-                autoPlayCurve: Curves.fastOutSlowIn,
-                enableInfiniteScroll: true,
-                autoPlayAnimationDuration: const Duration(milliseconds: 800),
-                viewportFraction: 0.8,
-                onPageChanged: (index, reason) {
-                  setState(() {
-                    _currentCarouselIndex = index;
-                  });
-                },
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Quick Action Buttons
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: _quickActions.map((action) {
-                  return Column(
-                    children: [
-                      GestureDetector(
-                        onTap: action['onTap'] != null
-                            ? () => action['onTap'](context)
-                            : null,
-                        child: Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            color: action['color'].withOpacity(0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            action['icon'],
-                            color: action['color'],
-                            size: 30,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        action['label'],
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  );
-                }).toList(),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Filter Bar
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: Row(
+      body: _isLoading
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: InputDecoration(
-                        hintText: 'Search members...',
-                        prefixIcon: const Icon(Icons.search),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide.none,
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Theme.of(context).primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Loading...',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: _refreshData,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  // Carousel Slider
+                  FlutterCarousel(
+                    items: _carouselItems.map((item) {
+                      return Builder(
+                        builder: (BuildContext context) {
+                          return GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ProgramDetailsScreen(
+                                    program: item,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              width: MediaQuery.of(context).size.width,
+                              margin:
+                                  const EdgeInsets.symmetric(horizontal: 5.0),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(15),
+                                image: DecorationImage(
+                                  image: NetworkImage(item['image']),
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(15),
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.transparent,
+                                      Colors.black.withOpacity(0.7),
+                                    ],
+                                  ),
+                                ),
+                                padding: const EdgeInsets.all(20),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item['title'],
+                                      style: GoogleFonts.poppins(
+                                        color: Colors.white,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 5),
+                                    Text(
+                                      item['description'],
+                                      style: GoogleFonts.poppins(
+                                        color: Colors.white,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    }).toList(),
+                    options: CarouselOptions(
+                      height: 200.0,
+                      autoPlay: true,
+                      enlargeCenterPage: true,
+                      aspectRatio: 16 / 9,
+                      autoPlayCurve: Curves.fastOutSlowIn,
+                      enableInfiniteScroll: true,
+                      autoPlayAnimationDuration:
+                          const Duration(milliseconds: 800),
+                      viewportFraction: 0.8,
+                      onPageChanged: (index, reason) {
+                        setState(() {
+                          _currentCarouselIndex = index;
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Quick Action Buttons
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: quickActions.map((action) {
+                        return Column(
+                          children: [
+                            GestureDetector(
+                              onTap: action['onTap'],
+                              child: Container(
+                                width: 60,
+                                height: 60,
+                                decoration: BoxDecoration(
+                                  color: action['color'].withOpacity(0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  action['icon'],
+                                  color: action['color'],
+                                  size: 30,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              action['label'],
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Filter Bar
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 10),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              hintText: 'Search members...',
+                              prefixIcon: const Icon(Icons.search),
+                              suffixIcon: _searchController.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.close),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                      },
+                                    )
+                                  : null,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide.none,
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey[200],
+                            ),
+                          ),
                         ),
-                        filled: true,
-                        fillColor: Colors.grey[200],
+                        const SizedBox(width: 10),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: GestureDetector(
+                            onTap: _showFilterOptions,
+                            child: const Icon(Icons.filter_list),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Member Counter
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                    child: Text(
+                      '${_filteredMembers.length} Members',
+                      style: GoogleFonts.poppins(
+                        color: Colors.grey[600],
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: GestureDetector(
-                      onTap: _showFilterOptions,
-                      child: const Icon(Icons.filter_list),
+
+                  // Member Tiles
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _filteredMembers.length,
+                      itemBuilder: (context, index) {
+                        final member = _filteredMembers[index];
+                        print('Building member tile for: ${member['jcName']}');
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            leading: CircleAvatar(
+                              radius: 22,
+                              backgroundColor: Colors.grey[200],
+                              backgroundImage: member['jcImage'] != null
+                                  ? NetworkImage(
+                                      '${ApiConfig.baseUrl}${member['jcImage']}')
+                                  : null,
+                              child: member['jcImage'] == null
+                                  ? const Icon(Icons.person)
+                                  : null,
+                            ),
+                            title: Text(
+                              member['jcName'] != null
+                                  ? member['jcName']
+                                      .toString()
+                                      .split(' ')
+                                      .map((word) => word.isNotEmpty
+                                          ? word[0].toUpperCase() +
+                                              word.substring(1).toLowerCase()
+                                          : '')
+                                      .join(' ')
+                                  : 'N/A',
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  member['jcpost'] ?? 'General Member',
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.grey[600],
+                                    fontSize: 14,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (member['jcMobile']?['phone_number'] != null)
+                                  Text(
+                                    member['jcMobile']?['phone_number'] ?? '',
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.grey[600],
+                                      fontSize: 14,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                              ],
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (member['jcMobile']?['phone_number'] != null)
+                                  IconButton(
+                                    icon: _buildWhatsAppIcon(),
+                                    onPressed: () => _launchWhatsApp(
+                                        member['jcMobile']?['phone_number']),
+                                    tooltip: 'Open WhatsApp',
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(
+                                      minWidth: 32,
+                                      minHeight: 32,
+                                    ),
+                                  ),
+                                IconButton(
+                                  icon: const Icon(Icons.phone),
+                                  onPressed: () {
+                                    print(
+                                        'Phone button pressed for: ${member['jcName']}');
+                                    _launchPhoneCall(
+                                        member['jcMobile']?['phone_number']);
+                                  },
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(
+                                    minWidth: 32,
+                                    minHeight: 32,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            onTap: () {
+                              print('Member tile tapped: ${member['jcName']}');
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => MemberDetailsScreen(
+                                    member: member,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ],
               ),
             ),
-
-            // Member Tiles
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _filteredMembers.length,
-                itemBuilder: (context, index) {
-                  final member = _filteredMembers[index];
-                  print('Building member tile for: ${member['jcName']}');
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      leading: CircleAvatar(
-                        radius: 22,
-                        backgroundColor: Colors.grey[200],
-                        backgroundImage: member['jcImage'] != null
-                            ? NetworkImage(
-                                '${ApiConfig.baseUrl}${member['jcImage']}')
-                            : null,
-                        child: member['jcImage'] == null
-                            ? const Icon(Icons.person)
-                            : null,
-                      ),
-                      title: Text(
-                        member['jcName'] != null
-                            ? member['jcName']
-                                .toString()
-                                .split(' ')
-                                .map((word) => word.isNotEmpty
-                                    ? word[0].toUpperCase() +
-                                        word.substring(1).toLowerCase()
-                                    : '')
-                                .join(' ')
-                            : 'N/A',
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            member['jcpost'] ?? 'General Member',
-                            style: GoogleFonts.poppins(
-                              color: Colors.grey[600],
-                              fontSize: 14,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (member['jcMobile']?['phone_number'] != null)
-                            Text(
-                              member['jcMobile']?['phone_number'] ?? '',
-                              style: GoogleFonts.poppins(
-                                color: Colors.grey[600],
-                                fontSize: 14,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                        ],
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (member['jcMobile']?['phone_number'] != null)
-                            IconButton(
-                              icon: _buildWhatsAppIcon(),
-                              onPressed: () => _launchWhatsApp(
-                                  member['jcMobile']?['phone_number']),
-                              tooltip: 'Open WhatsApp',
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 32,
-                                minHeight: 32,
-                              ),
-                            ),
-                          IconButton(
-                            icon: const Icon(Icons.phone),
-                            onPressed: () {
-                              print(
-                                  'Phone button pressed for: ${member['jcName']}');
-                              _launchPhoneCall(
-                                  member['jcMobile']?['phone_number']);
-                            },
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(
-                              minWidth: 32,
-                              minHeight: 32,
-                            ),
-                          ),
-                        ],
-                      ),
-                      onTap: () {
-                        print('Member tile tapped: ${member['jcName']}');
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => MemberDetailsScreen(
-                              member: member,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 

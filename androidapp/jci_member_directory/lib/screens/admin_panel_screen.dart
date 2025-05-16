@@ -1179,7 +1179,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
       print('3. Making API call to dashboard endpoint...');
       final response = await ApiService.get(
-        endpoint: 'api/admin/dashboard/',
+        endpoint: 'jks/api/admin/dashboard/',
         token: token,
       );
 

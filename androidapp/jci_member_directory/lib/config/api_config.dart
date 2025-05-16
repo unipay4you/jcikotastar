@@ -1,9 +1,13 @@
 class ApiConfig {
-  // Base URL for development
-  // Use 10.0.2.2 for Android emulator to access host machine's localhost
-  // Use actual IP address for real devices
-  static const String baseUrl =
-      'http://192.168.1.2:8000/'; // Replace with your computer's IP address
+  // Environment flag - set to false for development, true for production
+  static const bool isProduction = true;
+
+  // Base URLs
+  static const String devBaseUrl = 'http://192.168.1.2:8000/';
+  static const String prodBaseUrl = 'https://mylegaldiary.in/';
+
+  // Get base URL based on environment
+  static String get baseUrl => isProduction ? prodBaseUrl : devBaseUrl;
 
   // API Endpoints
   static const String login = 'jks/api/auth/login/';

@@ -112,9 +112,9 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
     try {
       final token = await AuthService.getAccessToken();
       print(
-          'Calling API: api/program-images/program-id/ with program_id: ${widget.folder.id}');
+          'Calling API: jks/api/program-images/program-id/ with program_id: ${widget.folder.id}');
       final response = await ApiService.post(
-        endpoint: 'api/program-images/program-id/',
+        endpoint: 'jks/api/program-images/program-id/',
         body: {'program_id': widget.folder.id},
         token: token,
       );

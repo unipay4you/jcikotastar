@@ -715,11 +715,11 @@ class _AddNewMemberScreenState extends State<AddNewMemberScreen> {
 
         // Format dates
         String formatDate(String? dateStr) {
-          if (dateStr == null || dateStr.isEmpty) return "";
+          if (dateStr == null || dateStr.isEmpty) return "1950-01-01";
           try {
             // Split the date string by '/'
             final parts = dateStr.split('/');
-            if (parts.length != 3) return "";
+            if (parts.length != 3) return "1950-01-01";
 
             // Create DateTime object from parts
             final date = DateTime(
@@ -732,12 +732,12 @@ class _AddNewMemberScreenState extends State<AddNewMemberScreen> {
             return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
           } catch (e) {
             print('Error formatting date: $e');
-            return "";
+            return "1950-01-01";
           }
         }
 
         final response = await ApiService.post(
-          endpoint: 'api/admin/addmember/',
+          endpoint: 'jks/api/admin/addmember/',
           body: {
             "jcName": _jcNameController.text.isEmpty
                 ? ""

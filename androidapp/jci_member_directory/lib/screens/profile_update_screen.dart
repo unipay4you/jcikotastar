@@ -466,22 +466,16 @@ class _ProfileUpdateScreenState extends State<ProfileUpdateScreen> {
         }
 
         // Format dates to YYYY-MM-DD, preserving existing dates if no changes
-        String formatDate(String dateStr, String? existingDate) {
-          if (dateStr.isEmpty) {
-            // If no new date is provided, return the existing date
-            if (existingDate != null && existingDate.isNotEmpty) {
-              return existingDate;
-            }
-            return "1900-01-01";
+        String formatDate(String inputDate, String? existingDate) {
+          if (inputDate.isEmpty) {
+            return "1950-01-01";
           }
+
           try {
-            final parts = dateStr.split('/');
+            final parts = inputDate.split('/');
             if (parts.length != 3) {
-              // If date format is invalid, return existing date
-              if (existingDate != null && existingDate.isNotEmpty) {
-                return existingDate;
-              }
-              return "1900-01-01";
+              // If date format is invalid, return default date
+              return "1950-01-01";
             }
 
             final day = int.parse(parts[0]);
@@ -490,21 +484,13 @@ class _ProfileUpdateScreenState extends State<ProfileUpdateScreen> {
 
             // Validate date components
             if (day < 1 || day > 31 || month < 1 || month > 12 || year < 1900) {
-              // If date is invalid, return existing date
-              if (existingDate != null && existingDate.isNotEmpty) {
-                return existingDate;
-              }
-              return "1900-01-01";
+              return "1950-01-01";
             }
 
             return "$year-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}";
           } catch (e) {
             print('Error formatting date: $e');
-            // If there's an error, return existing date
-            if (existingDate != null && existingDate.isNotEmpty) {
-              return existingDate;
-            }
-            return "1900-01-01";
+            return "1950-01-01";
           }
         }
 
@@ -881,16 +867,16 @@ class _ProfileUpdateScreenState extends State<ProfileUpdateScreen> {
                           suffixIcon: IconButton(
                             icon: const Icon(Icons.calendar_today),
                             onPressed: () async {
-                          final DateTime? picked = await showDatePicker(
-                            context: context,
+                              final DateTime? picked = await showDatePicker(
+                                context: context,
                                 initialDate: _getInitialDate(
                                     _jcDobController.text, _eighteenYearsAgo),
-                            firstDate: _hundredYearsAgo,
-                            lastDate: _eighteenYearsAgo,
-                          );
-                          if (picked != null) {
-                            setState(() {
-                              _jcDobController.text =
+                                firstDate: _hundredYearsAgo,
+                                lastDate: _eighteenYearsAgo,
+                              );
+                              if (picked != null) {
+                                setState(() {
+                                  _jcDobController.text =
                                       "${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}";
                                 });
                               }
@@ -1102,16 +1088,16 @@ class _ProfileUpdateScreenState extends State<ProfileUpdateScreen> {
                           suffixIcon: IconButton(
                             icon: const Icon(Icons.calendar_today),
                             onPressed: () async {
-                          final DateTime? picked = await showDatePicker(
-                            context: context,
+                              final DateTime? picked = await showDatePicker(
+                                context: context,
                                 initialDate: _getInitialDate(
                                     _jcrtDobController.text, _eighteenYearsAgo),
-                            firstDate: _hundredYearsAgo,
-                            lastDate: _eighteenYearsAgo,
-                          );
-                          if (picked != null) {
-                            setState(() {
-                              _jcrtDobController.text =
+                                firstDate: _hundredYearsAgo,
+                                lastDate: _eighteenYearsAgo,
+                              );
+                              if (picked != null) {
+                                setState(() {
+                                  _jcrtDobController.text =
                                       "${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}";
                                 });
                               }
@@ -1241,34 +1227,34 @@ class _ProfileUpdateScreenState extends State<ProfileUpdateScreen> {
                           suffixIcon: IconButton(
                             icon: const Icon(Icons.calendar_today),
                             onPressed: () async {
-                          // Parse DOB dates if they exist
+                              // Parse DOB dates if they exist
                               DateTime? jcDob =
                                   _parseDate(_jcDobController.text);
                               DateTime? jcrtDob =
                                   _parseDate(_jcrtDobController.text);
 
-                          // Calculate the later 18th birthday if both DOBs exist
-                          DateTime? later18thBirthday;
-                          if (jcDob != null && jcrtDob != null) {
-                            final jc18thBirthday = DateTime(
-                                jcDob.year + 18, jcDob.month, jcDob.day);
-                            final jcrt18thBirthday = DateTime(
+                              // Calculate the later 18th birthday if both DOBs exist
+                              DateTime? later18thBirthday;
+                              if (jcDob != null && jcrtDob != null) {
+                                final jc18thBirthday = DateTime(
+                                    jcDob.year + 18, jcDob.month, jcDob.day);
+                                final jcrt18thBirthday = DateTime(
                                     jcrtDob.year + 18,
                                     jcrtDob.month,
                                     jcrtDob.day);
-                            later18thBirthday = jcDob.isAfter(jcrtDob)
-                                ? jc18thBirthday
-                                : jcrt18thBirthday;
-                          }
+                                later18thBirthday = jcDob.isAfter(jcrtDob)
+                                    ? jc18thBirthday
+                                    : jcrt18thBirthday;
+                              }
 
                               // Get initial date for picker
                               DateTime initialDate;
-                          if (_anniversaryDateController.text.isNotEmpty) {
+                              if (_anniversaryDateController.text.isNotEmpty) {
                                 try {
                                   final parts = _anniversaryDateController.text
                                       .split('/');
                                   if (parts.length == 3) {
-                            initialDate = DateTime(
+                                    initialDate = DateTime(
                                       int.parse(parts[2]), // year
                                       int.parse(parts[1]), // month
                                       int.parse(parts[0]), // day
@@ -1295,34 +1281,34 @@ class _ProfileUpdateScreenState extends State<ProfileUpdateScreen> {
                               }
                               if (initialDate.isAfter(DateTime.now())) {
                                 initialDate = DateTime.now();
-                          }
+                              }
 
-                          final DateTime? picked = await showDatePicker(
-                            context: context,
-                            initialDate: initialDate,
-                            firstDate: later18thBirthday ?? DateTime(1900),
-                            lastDate: DateTime.now(),
-                            builder: (context, child) {
-                              return Theme(
-                                data: Theme.of(context).copyWith(
-                                  colorScheme: ColorScheme.light(
-                                    primary: Theme.of(context).primaryColor,
-                                    onPrimary: Colors.white,
-                                    surface: Colors.white,
-                                    onSurface: Colors.black,
-                                  ),
-                                ),
-                                child: child!,
+                              final DateTime? picked = await showDatePicker(
+                                context: context,
+                                initialDate: initialDate,
+                                firstDate: later18thBirthday ?? DateTime(1900),
+                                lastDate: DateTime.now(),
+                                builder: (context, child) {
+                                  return Theme(
+                                    data: Theme.of(context).copyWith(
+                                      colorScheme: ColorScheme.light(
+                                        primary: Theme.of(context).primaryColor,
+                                        onPrimary: Colors.white,
+                                        surface: Colors.white,
+                                        onSurface: Colors.black,
+                                      ),
+                                    ),
+                                    child: child!,
+                                  );
+                                },
                               );
-                            },
-                          );
 
-                          if (picked != null) {
-                            setState(() {
-                              _anniversaryDateController.text =
-                                  "${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}";
-                            });
-                          }
+                              if (picked != null) {
+                                setState(() {
+                                  _anniversaryDateController.text =
+                                      "${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}";
+                                });
+                              }
                             },
                           ),
                         ),

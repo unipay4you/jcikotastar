@@ -534,11 +534,11 @@ class _EditMemberScreenState extends State<EditMemberScreen> {
         };
 
         print('\nSending Update Request:');
-        print('Request URL: ${ApiConfig.baseUrl}api/admin/members/update/');
+        print('Request URL: ${ApiConfig.baseUrl}jks/api/admin/members/update/');
         print('Request Body: ${json.encode(requestBody)}');
 
         final response = await http.post(
-          Uri.parse('${ApiConfig.baseUrl}api/admin/members/update/'),
+          Uri.parse('${ApiConfig.baseUrl}jks/api/admin/members/update/'),
           headers: ApiConfig.getHeaders(token: token),
           body: json.encode(requestBody),
         );

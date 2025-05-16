@@ -51,7 +51,7 @@ class _ProgramManagementScreenState extends State<ProgramManagementScreen>
           'Auth Token retrieved: ${token != null ? 'Token exists' : 'No token'}');
 
       final response = await ApiService.get(
-        endpoint: 'api/admin/programs/',
+        endpoint: 'jks/api/admin/programs/',
         token: token,
       );
 
@@ -809,7 +809,7 @@ class _ProgramManagementScreenState extends State<ProgramManagementScreen>
 
                       final token = await AuthService.getAccessToken();
                       final response = await ApiService.post(
-                        endpoint: 'api/admin/members/programs/update/',
+                        endpoint: 'jks/api/admin/members/programs/update/',
                         body: {
                           'program_id': program['id'],
                           'programName': nameController.text.toUpperCase(),
@@ -1149,7 +1149,7 @@ class _ProgramManagementScreenState extends State<ProgramManagementScreen>
 
                       final token = await AuthService.getAccessToken();
                       final response = await ApiService.post(
-                        endpoint: 'api/admin/members/programs/add/',
+                        endpoint: 'jks/api/admin/members/programs/add/',
                         body: {
                           'programName': nameController.text.toUpperCase(),
                           'year': DateTime.now().year.toString(),

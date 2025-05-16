@@ -174,7 +174,7 @@ class _ForgotPasswordOTPScreenState extends State<ForgotPasswordOTPScreen> {
     try {
       final otp = _controllers.map((controller) => controller.text).join();
       final response = await ApiService.post(
-        endpoint: 'api/auth/verify-forgat-password-otp/',
+        endpoint: 'jks/api/auth/verify-forgat-password-otp/',
         body: {
           'phone_number': _phoneNumber,
           'otp': otp,

@@ -22,6 +22,8 @@ import 'package:android_intent_plus/android_intent.dart';
 import 'package:android_intent_plus/flag.dart';
 import 'user/user_programs_screen.dart';
 import 'user/user_greetings_screen.dart';
+import 'user/edit_greeting_card_screen.dart';
+import 'user/greeting_cards_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
@@ -654,6 +656,135 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  void _showGreetingsImage() {
+    // Get the user's profile image URL
+    String? profileImageUrl;
+    if (_profileData?['user_profile_image'] != null) {
+      String imagePath = _profileData!['user_profile_image'].toString();
+      // Remove file:/// prefix if present
+      if (imagePath.startsWith('file:///')) {
+        imagePath = imagePath.replaceFirst('file:///', '');
+      }
+      // Remove leading slash if present
+      if (imagePath.startsWith('/')) {
+        imagePath = imagePath.substring(1);
+      }
+      // Add base URL if not already a full URL
+      profileImageUrl = imagePath.startsWith('http')
+          ? imagePath
+          : '${ApiConfig.baseUrl}$imagePath';
+    }
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 503,
+                  height: 472,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Background greeting image
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(15),
+                        child: Image.asset(
+                          'assets/media/Greetings/pink.png',
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) {
+                            print('Error loading greeting image: $error');
+                            return Container(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                children: [
+                                  const Icon(Icons.error_outline,
+                                      color: Colors.red, size: 48),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Error loading greeting image',
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.red,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      // User profile image overlay
+                      if (profileImageUrl != null)
+                        Positioned(
+                          child: Container(
+                            width: 150,
+                            height: 150,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 4,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Image.network(
+                                profileImageUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  print('Error loading profile image: $error');
+                                  return Container(
+                                    color: Colors.grey[200],
+                                    child: const Icon(
+                                      Icons.person,
+                                      size: 75,
+                                      color: Colors.grey,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text(
+                    'Close',
+                    style: GoogleFonts.poppins(
+                      color: Colors.blue,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final userName = _profileData?['user_name']?.toString() ?? '';
@@ -876,6 +1007,31 @@ class _MainScreenState extends State<MainScreen> {
               onTap: () {
                 Navigator.pop(context);
                 // TODO: Navigate to settings
+              },
+            ),
+            // Greeting Card button
+            ListTile(
+              leading: const Icon(
+                Icons.card_giftcard,
+                color: Colors.purple,
+              ),
+              title: Text(
+                'Greeting Card',
+                style: GoogleFonts.poppins(
+                  color: Colors.purple,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context); // Close drawer
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => GreetingCardsScreen(
+                      profileData: _profileData,
+                    ),
+                  ),
+                );
               },
             ),
             if (userType.toLowerCase() == 'admin') ...[

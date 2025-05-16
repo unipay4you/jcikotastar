@@ -252,7 +252,11 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
   Future<void> _uploadImages() async {
     try {
       print('Test1: Starting image upload process');
-      final List<XFile> images = await _picker.pickMultiImage();
+      final List<XFile> images = await _picker.pickMultiImage(
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
       print('Test2: Selected ${images.length} images');
 
       if (images.isEmpty) {
@@ -268,82 +272,138 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
       final token = await AuthService.getAccessToken();
       print('Test4: Got auth token');
 
-      // Convert all images to base64 with size limit check
-      final List<Map<String, String>> imageData = [];
-      for (final image in images) {
-        try {
-          print('Test5: Processing image: ${image.name}');
-          final File imageFile = File(image.path);
-          final bytes = await imageFile.readAsBytes();
-          print(
-              'Test6: Image size: ${(bytes.length / (1024 * 1024)).toStringAsFixed(2)}MB');
+      int uploadedCount = 0;
+      int totalImages = images.length;
+      const int batchSize = 5;
 
-          // Check file size (limit to 10MB)
-          if (bytes.length > 10 * 1024 * 1024) {
-            print('Test7: Image too large: ${image.name}');
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                    'Image ${image.name} is too large. Maximum size is 10MB'),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 3),
-              ),
-            );
+      // Show initial upload dialog
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('Uploading Images', style: GoogleFonts.poppins()),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Uploaded $uploadedCount of $totalImages images',
+                  style: GoogleFonts.poppins(),
+                ),
+                const SizedBox(height: 16),
+                LinearProgressIndicator(
+                  value: uploadedCount / totalImages,
+                ),
+              ],
+            ),
+          );
+        },
+      );
+
+      // Process images in batches
+      for (int i = 0; i < images.length; i += batchSize) {
+        final end =
+            (i + batchSize < images.length) ? i + batchSize : images.length;
+        final batch = images.sublist(i, end);
+        final List<Map<String, String>> batchData = [];
+
+        // Process each image in the batch
+        for (final image in batch) {
+          try {
+            print('Test5: Processing image: ${image.name}');
+            final File imageFile = File(image.path);
+            final bytes = await imageFile.readAsBytes();
+            print(
+                'Test6: Image size: ${(bytes.length / (1024 * 1024)).toStringAsFixed(2)}MB');
+
+            // Check file size (limit to 10MB)
+            if (bytes.length > 10 * 1024 * 1024) {
+              print('Test7: Image too large: ${image.name}');
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                      'Image ${image.name} is too large. Maximum size is 10MB'),
+                  backgroundColor: Colors.red,
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+              continue;
+            }
+
+            final base64Image = base64Encode(bytes);
+            batchData.add({'image': base64Image});
+          } catch (e) {
+            print('Error processing image ${image.name}: $e');
             continue;
           }
+        }
 
-          final base64Image = base64Encode(bytes);
-          imageData.add({
-            'image': base64Image,
-          });
-          print('Test8: Successfully processed image: ${image.name}');
-        } catch (e) {
-          print('Test9: Error processing image ${image.name}: $e');
-          continue;
+        if (batchData.isNotEmpty) {
+          // Prepare request body for batch
+          final Map<String, dynamic> requestBody = {
+            'images': batchData,
+          };
+
+          // If it's a new folder (ID contains timestamp), add programName and year
+          if (widget.folder.id.length > 10) {
+            requestBody['program_id'] = widget.folder.id;
+            requestBody['programName'] = widget.folder.name;
+            requestBody['year'] = DateTime.now().year.toString();
+          } else {
+            requestBody['program_id'] = widget.folder.id;
+          }
+
+          // Upload batch
+          final response = await ApiService.post(
+            endpoint: ApiConfig.uploadProgramImage,
+            body: requestBody,
+            token: token,
+          );
+
+          if (response['status'] == 200) {
+            uploadedCount += batchData.length;
+            // Update progress dialog
+            if (!mounted) return;
+            Navigator.of(context).pop(); // Remove old dialog
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  title: Text('Uploading Images', style: GoogleFonts.poppins()),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Uploaded $uploadedCount of $totalImages images',
+                        style: GoogleFonts.poppins(),
+                      ),
+                      const SizedBox(height: 16),
+                      LinearProgressIndicator(
+                        value: uploadedCount / totalImages,
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          } else {
+            print('Failed to upload batch: ${response['message']}');
+          }
         }
       }
 
-      if (imageData.isEmpty) {
-        print('Test10: No valid images to upload');
-        setState(() {
-          _isLoading = false;
-        });
-        return;
-      }
+      // Close the progress dialog
+      if (!mounted) return;
+      Navigator.of(context).pop();
 
-      print('Test11: Total images to upload: ${imageData.length}');
-
-      // Prepare request body
-      final Map<String, dynamic> requestBody = {
-        'images': imageData,
-      };
-
-      // If it's a new folder (ID contains timestamp), add programName and year
-      if (widget.folder.id.length > 10) {
-        print('Test12: Adding program details for new folder');
-        requestBody['program_id'] = widget.folder.id;
-        requestBody['programName'] = widget.folder.name;
-        requestBody['year'] = DateTime.now().year.toString();
-      } else {
-        requestBody['program_id'] = widget.folder.id;
-      }
-
-      print('Test13: Sending upload request');
-      // Send all images in a single request
-      final response = await ApiService.post(
-        endpoint: ApiConfig.uploadProgramImage,
-        body: requestBody,
-        token: token,
-      );
-
-      print('Test14: Upload response status: ${response['status']}');
-      if (response['status'] == 200) {
-        print('Test15: Upload successful');
-        if (!mounted) return;
+      if (uploadedCount > 0) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Images uploaded successfully'),
+          SnackBar(
+            content: Text(
+                'Successfully uploaded $uploadedCount of $totalImages images'),
             backgroundColor: Colors.green,
           ),
         );
@@ -352,17 +412,15 @@ class _ProgramImageGalleryScreenState extends State<ProgramImageGalleryScreen> {
         _imagesLoaded = false;
         await _loadImages(); // Reload images after upload
       } else {
-        print('Test16: Upload failed: ${response['message']}');
-        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(response['message'] ?? 'Failed to upload images'),
+          const SnackBar(
+            content: Text('No images were uploaded successfully'),
             backgroundColor: Colors.red,
           ),
         );
       }
     } catch (e) {
-      print('Test17: Error in upload process: $e');
+      print('Error in upload process: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

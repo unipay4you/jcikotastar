@@ -6,20 +6,20 @@ class ApiConfig {
       'http://192.168.1.2:8000/'; // Replace with your computer's IP address
 
   // API Endpoints
-  static const String login = 'api/auth/login/';
-  static const String register = 'api/auth/register/';
-  static const String verifyOtp = 'api/auth/verify-otp/';
-  static const String forgotPassword = 'api/auth/forgot-password/';
-  static const String resetPassword = 'api/auth/reset-password/';
-  static const String resendOtp = 'api/auth/resend-otp/';
-  static const String userProfile = 'api/auth/user/';
-  static const String profile = 'api/user/profile/';
-  static const String updateProfile = 'api/user/update-profile/';
-  static const String members = 'api/members/';
-  static const String memberDetails = 'api/members/';
-  static const String adminDashboard = 'api/admin/dashboard/';
-  static const String programImages = 'api/program-images/';
-  static const String uploadProgramImage = 'api/program-images/upload/';
+  static const String login = 'jks/api/auth/login/';
+  //static const String register = 'jks/api/auth/register/';
+  static const String verifyOtp = 'jks/api/auth/verify-otp/';
+  static const String forgotPassword = 'jks/api/auth/forgot-password/';
+  static const String resetPassword = 'jks/api/auth/reset-password/';
+  static const String resendOtp = 'jks/api/auth/resend-otp/';
+  static const String userProfile = 'jks/api/auth/user/';
+  static const String profile = 'jks/api/user/profile/';
+  static const String updateProfile = 'jks/api/user/update-profile/';
+  static const String members = 'jks/api/members/';
+  static const String memberDetails = 'jks/api/members/';
+  static const String adminDashboard = 'jks/api/admin/dashboard/';
+  static const String programImages = 'jks/api/program-images/';
+  static const String uploadProgramImage = 'jks/api/program-images/upload/';
 
   // API Headers
   static Map<String, String> getHeaders({String? token}) {

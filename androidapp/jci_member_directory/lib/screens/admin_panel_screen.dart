@@ -389,65 +389,92 @@ class _AdminMemberListScreenState extends State<AdminMemberListScreen> {
                                         vertical: 12,
                                       ),
                                       minVerticalPadding: 12,
-                                      leading: CircleAvatar(
-                                        radius: 30,
-                                        backgroundColor: Colors.grey[200],
-                                        backgroundImage: member['jcImage'] !=
-                                                null
-                                            ? NetworkImage(
-                                                '${ApiConfig.baseUrl}${member['jcImage']}')
-                                            : null,
-                                        child: member['jcImage'] == null
-                                            ? const Icon(Icons.person, size: 30)
-                                            : null,
+                                      leading: Stack(
+                                        clipBehavior: Clip.none,
+                                        children: [
+                                          CircleAvatar(
+                                            radius: 30,
+                                            backgroundColor: Colors.grey[200],
+                                            backgroundImage: member[
+                                                        'jcImage'] !=
+                                                    null
+                                                ? NetworkImage(
+                                                    '${ApiConfig.baseUrl}${member['jcImage']}')
+                                                : null,
+                                            child: member['jcImage'] == null
+                                                ? const Icon(Icons.person,
+                                                    size: 30)
+                                                : null,
+                                          ),
+                                          if (member['jcMobile']
+                                                  ?['user_type'] ==
+                                              'admin')
+                                            Positioned(
+                                              bottom: -4,
+                                              right: -4,
+                                              child: Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 8,
+                                                  vertical: 4,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.blue,
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                  border: Border.all(
+                                                    color: Colors.white,
+                                                    width: 2,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  'Admin',
+                                                  style: GoogleFonts.poppins(
+                                                    color: Colors.white,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                        ],
                                       ),
                                       title: Padding(
                                         padding: const EdgeInsets.only(top: 4),
                                         child: Row(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Expanded(
-                                              child: Row(
-                                                children: [
-                                                  Text(
-                                                    member['jcName'] ?? 'N/A',
-                                                    style: GoogleFonts.poppins(
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      fontSize: 18,
-                                                    ),
-                                                  ),
-                                                  if (member['jcMobile']
-                                                          ?['user_type'] ==
-                                                      'admin')
-                                                    Container(
-                                                      margin:
-                                                          const EdgeInsets.only(
-                                                              left: 8),
-                                                      padding: const EdgeInsets
-                                                          .symmetric(
-                                                        horizontal: 8,
-                                                        vertical: 2,
-                                                      ),
-                                                      decoration: BoxDecoration(
-                                                        color: Colors.blue,
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(12),
-                                                      ),
-                                                      child: Text(
-                                                        'Admin',
-                                                        style:
-                                                            GoogleFonts.poppins(
-                                                          color: Colors.white,
-                                                          fontSize: 12,
-                                                          fontWeight:
-                                                              FontWeight.w500,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                ],
+                                              child: Text(
+                                                member['jcName'] ?? 'N/A',
+                                                style: GoogleFonts.poppins(
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 16,
+                                                ),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
+                                            if (member['jcMobile']?['user_type'] == 'admin')
+                                              Container(
+                                                margin: const EdgeInsets.only(left: 8, top: 2),
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 8,
+                                                  vertical: 4,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.blue,
+                                                  borderRadius: BorderRadius.circular(12),
+                                                ),
+                                                child: Text(
+                                                  'Admin',
+                                                  style: GoogleFonts.poppins(
+                                                    color: Colors.white,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ),
                                           ],
                                         ),
                                       ),
@@ -593,7 +620,7 @@ class _AdminMemberListScreenState extends State<AdminMemberListScreen> {
                                                       final response =
                                                           await ApiService.post(
                                                         endpoint:
-                                                            'api/admin/members/make-admin/',
+                                                            'jks/api/admin/members/make-admin/',
                                                         body: {
                                                           'member_id':
                                                               member['id'],
@@ -830,7 +857,7 @@ class _AdminMemberListScreenState extends State<AdminMemberListScreen> {
                                                             await ApiService
                                                                 .post(
                                                           endpoint:
-                                                              'api/admin/members/update-post/',
+                                                              'jks/api/admin/members/update-post/',
                                                           body: {
                                                             'member_id':
                                                                 member['id'],
@@ -1051,7 +1078,7 @@ class _AdminMemberListScreenState extends State<AdminMemberListScreen> {
 
       final token = await AuthService.getAccessToken();
       final response = await ApiService.post(
-        endpoint: 'api/admin/members/change-status/',
+        endpoint: 'jks/api/admin/members/change-status/',
         body: {
           'member_id': member['id'],
         },
